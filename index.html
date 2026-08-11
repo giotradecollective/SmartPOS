@@ -928,6 +928,13 @@
   .pos-pay-secondary:hover{ border-color:#3a3a3a; box-shadow:var(--shadow-soft); }
   .pos-pay-secondary.selected{ border-color:var(--amber); color:var(--amber); }
   .pos-empty-cart{ text-align:center; color:var(--text-dim); font-size:12.5px; padding:30px 10px; }
+  /* Prepare Receipt toggle — gates checkout; a JPEG receipt downloads once the sale completes */
+  .pos-receipt-toggle{ display:flex; align-items:center; gap:10px; padding:11px 12px; margin-bottom:4px;
+    background:var(--surface-2); border:1px solid var(--border); border-radius:10px; cursor:pointer; transition:border-color .15s, background .15s; }
+  .pos-receipt-toggle:hover{ border-color:#3a3a3a; }
+  .pos-receipt-toggle input[type="checkbox"]{ width:17px; height:17px; accent-color:var(--amber); flex-shrink:0; cursor:pointer; }
+  .pos-receipt-toggle span{ display:flex; align-items:center; gap:7px; font-size:13px; font-weight:700; color:var(--text); }
+  .pos-receipt-toggle:has(input:checked){ border-color:var(--amber); background:rgba(255,255,255,0.04); }
   .pos-toast{ position:fixed; bottom:24px; right:24px; background:var(--mint); color:#06251a; font-weight:700;
     font-size:13px; padding:12px 18px; border-radius:10px; box-shadow:0 12px 30px -8px rgba(0,0,0,.6);
     z-index:50; opacity:0; transform:translateY(8px); transition:opacity .2s, transform .2s; pointer-events:none; }
@@ -1234,6 +1241,35 @@
             <div class="ord-no" id="pos-ord-no" style="margin:-6px 0 12px;">New sale</div>
 
             <div class="pos-cart-items" id="pos-cart-items"></div>
+
+            <!-- Customer details: optional per-sale info, mirrors the Customers (CRM)
+                 tab's columns. If a name/phone/email is entered here, checkout upserts
+                 a matching row in the customers table (see resolvePosCustomer()) and
+                 prints these details on the receipt. Not required to complete a sale. -->
+            <div class="field" style="margin-bottom:10px;">
+              <label for="pos-cust-name" style="display:flex; align-items:center; gap:6px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:11px;height:11px;"><circle cx="12" cy="8" r="3.5"/><path d="M4.5 20c1.5-4 4-6 7.5-6s6 2 7.5 6"/></svg>
+                Customer <span class="muted" style="font-size:9.5px; text-transform:none; letter-spacing:0;">(optional)</span>
+              </label>
+              <div class="input-wrap"><input id="pos-cust-name" type="text" placeholder="Full name" autocomplete="off" style="padding-left:12px;" /></div>
+              <div style="display:flex; gap:8px; margin-top:8px;">
+                <div class="input-wrap" style="flex:1;"><input id="pos-cust-phone" type="tel" inputmode="tel" placeholder="Phone" autocomplete="off" style="padding-left:12px;" /></div>
+                <div class="input-wrap" style="flex:1;"><input id="pos-cust-email" type="email" placeholder="Email" autocomplete="off" style="padding-left:12px;" /></div>
+              </div>
+            </div>
+
+            <!-- Prepare Receipt: must be ticked before Charge is enabled (see renderPosCart's
+                 pay-button gate). Once the sale completes, a JPEG receipt — business, order
+                 and customer details baked in — is generated client-side and downloaded
+                 automatically (downloadReceiptImage(), called from completeSale()). -->
+            <label class="pos-receipt-toggle" for="pos-prepare-receipt">
+              <input type="checkbox" id="pos-prepare-receipt" />
+              <span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
+                Prepare Receipt
+              </span>
+            </label>
+            <div style="font-size:10.5px; color:var(--text-dim); margin:-2px 0 12px 2px; line-height:1.4;">Required to charge — a downloadable receipt image is generated once the sale completes.</div>
 
             <div class="pos-totals">
               <div class="row"><span>Subtotal</span><span id="pos-subtotal" class="mono">R 0,00</span></div>
@@ -3858,16 +3894,19 @@ function initPos(){
     posCart = [];
     posDiscount = { type: 'percent', value: 0 };
     resetPosSaleKey();
+    resetPosReceiptFields();
     renderPosCart();
     showPosToast('Cart cleared.');
   });
 
   document.getElementById('pos-hold-btn').addEventListener('click', () => {
     if (!posCart.length) { showPosToast('Cart is empty — nothing to hold.', true); return; }
-    heldOrders.push({ cart: posCart, discount: posDiscount, heldAt: new Date() });
+    heldOrders.push({ cart: posCart, discount: posDiscount, heldAt: new Date(), customer: getPosCustomerInput(),
+      prepareReceipt: document.getElementById('pos-prepare-receipt').checked });
     posCart = [];
     posDiscount = { type: 'percent', value: 0 };
     resetPosSaleKey();
+    resetPosReceiptFields();
     renderPosCart();
     showPosToast(`Order held (${heldOrders.length} held).`);
   });
@@ -3877,6 +3916,10 @@ function initPos(){
       const held = heldOrders.pop();
       posCart = held.cart;
       posDiscount = held.discount || { type: 'percent', value: 0 };
+      document.getElementById('pos-cust-name').value = held.customer?.name || '';
+      document.getElementById('pos-cust-phone').value = held.customer?.phone || '';
+      document.getElementById('pos-cust-email').value = held.customer?.email || '';
+      document.getElementById('pos-prepare-receipt').checked = !!held.prepareReceipt;
       renderPosCart();
       showPosToast('Held order recalled.');
     } else {
@@ -3904,6 +3947,9 @@ function initPos(){
       completeSale();
     }
   });
+
+  // Charge stays disabled until this is ticked — see renderPosCart()'s pay-button gate.
+  document.getElementById('pos-prepare-receipt').addEventListener('change', renderPosCart);
 }
 
 function setPosViewMode(mode){
@@ -4070,7 +4116,8 @@ function renderPosCart(){
   const payAmountEl = document.getElementById('pos-pay-amount');
   if (payAmountEl) payAmountEl.innerHTML = `${fmtMoney(total)}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
-  document.getElementById('pos-pay-btn').disabled = posCart.length === 0 || posBusy;
+  const receiptPrepared = document.getElementById('pos-prepare-receipt').checked;
+  document.getElementById('pos-pay-btn').disabled = posCart.length === 0 || posBusy || !receiptPrepared;
   document.getElementById('pos-error').style.display = 'none';
 }
 
@@ -4203,6 +4250,14 @@ async function completeSale(){
   // instead of only ever seeing the moment it happened to arrive.
   const clientInitiatedAt = new Date().toISOString();
   const errBox = document.getElementById('pos-error');
+  // "Prepare Receipt" gates checkout the same way the till-open check below does —
+  // renderPosCart() already keeps the Charge button disabled until this is ticked,
+  // this is the server-call-side backstop for that same rule.
+  if (!document.getElementById('pos-prepare-receipt').checked) {
+    errBox.textContent = 'Tick "Prepare Receipt" before charging — a receipt image is generated automatically once the sale completes.';
+    errBox.style.display = 'block';
+    return;
+  }
   if (!BRANCH_ID) {
     errBox.textContent = 'No branch is set for this account and none exists on the business yet — add a row to the "branches" table first.';
     errBox.style.display = 'block';
@@ -4251,6 +4306,12 @@ async function completeSale(){
   const saleKey = ensurePosSaleKey();
   const orderNumber = 'POS-' + saleKey.slice(0, 8).toUpperCase();
 
+  // Cooked into both the order row (customer_id, so Orders/CRM can join back to
+  // this sale) and the receipt image below. Optional — resolvePosCustomer() is a
+  // no-op returning null if the Customer fields were left blank for this sale.
+  const customerInput = getPosCustomerInput();
+  const customerRecord = await resolvePosCustomer(customerInput);
+
   try {
     // Guard against duplicate submission: if this exact checkout attempt already
     // reached the server (e.g. the network dropped after insert but before the
@@ -4272,6 +4333,7 @@ async function completeSale(){
           business_id: BUSINESS_ID,
           branch_id: BRANCH_ID,
           cashier_id: CASHIER_ID,
+          customer_id: customerRecord?.id || null,
           order_number: orderNumber,
           idempotency_key: saleKey,
           device_id: TERMINAL_ID,
@@ -4416,16 +4478,33 @@ async function completeSale(){
     // NOTE: stock reduction, the inventory row upsert, and the stock_movements log
     // are all handled server-side by the trg_order_items_reduce_stock trigger on
     // order_items — don't duplicate that here. Just reload the affected views.
+    const soldItems = posCart; // captured before the cart is cleared, for the receipt image below
     posCart = [];
     posDiscount = { type: 'percent', value: 0 };
     const paidVia = dbPaymentMethod === 'split'
       ? 'split payment (' + (posSplitTenders || []).filter(t => t.amount > 0).map(t => t.method).join(' + ') + ')'
       : posPaymentMethod;
     resetPosSaleKey(); // sale is durably complete — next checkout is a new transaction (also clears posSplitTenders)
+    resetPosReceiptFields();
     renderPosCart();
     showPosToast(`Sale completed — ${fmtMoney(total)} via ${paidVia}.`);
+    // The whole reason "Prepare Receipt" gates checkout: as soon as the sale is
+    // durably recorded, bake the business, order and customer details into a JPEG
+    // and hand it straight to the browser's download flow.
+    downloadReceiptImage({
+      business: document.getElementById('sb-biz-name')?.textContent || 'Business',
+      branch: AUTH_PROFILE?.branches?.name || '',
+      title: 'SALES RECEIPT',
+      orderNumber,
+      dateStr: new Date().toLocaleString('en-ZA', { day:'2-digit', month:'short', year:'numeric', hour:'2-digit', minute:'2-digit' }),
+      cashier: document.getElementById('sb-name')?.textContent || AUTH_PROFILE?.full_name || 'Staff',
+      items: soldItems,
+      subtotal, discount, tax, total,
+      paymentLabel: paidVia.charAt(0).toUpperCase() + paidVia.slice(1),
+      customer: customerRecord ? { name: customerRecord.full_name, phone: customerRecord.phone, email: customerRecord.email } : customerInput,
+    });
     invalidatePeriodCache();
-    await Promise.allSettled([loadOrders(), loadKpis(), loadProducts(), loadInventory(), loadMovements()]);
+    await Promise.allSettled([loadOrders(), loadKpis(), loadProducts(), loadInventory(), loadMovements(), loadCustomers()]);
     renderSalesPerformanceCards();
     renderPosGrid();
     renderLowStock();
@@ -4439,6 +4518,328 @@ async function completeSale(){
     posBusy = false;
     btn.innerHTML = originalHtml;
     btn.disabled = posCart.length === 0;
+  }
+}
+
+function resetPosReceiptFields(){
+  const name = document.getElementById('pos-cust-name');
+  const phone = document.getElementById('pos-cust-phone');
+  const email = document.getElementById('pos-cust-email');
+  const prep = document.getElementById('pos-prepare-receipt');
+  if (name) name.value = '';
+  if (phone) phone.value = '';
+  if (email) email.value = '';
+  if (prep) prep.checked = false;
+}
+
+// Reads the optional Customer fields as typed — trimmed, blanks become null.
+// Returns null outright if every field is empty (no customer info given for this sale).
+function getPosCustomerInput(){
+  const name = (document.getElementById('pos-cust-name')?.value || '').trim();
+  const phone = (document.getElementById('pos-cust-phone')?.value || '').trim();
+  const email = (document.getElementById('pos-cust-email')?.value || '').trim();
+  if (!name && !phone && !email) return null;
+  return { name: name || null, phone: phone || null, email: email || null };
+}
+
+// ---- Customer resolution (CRM) ----
+// Cooks whatever was typed into the POS Customer fields into the same `customers`
+// table backing the Customers tab: matches an existing customer by phone (or,
+// failing that, email) within this business, and reuses that row so repeat visits
+// accumulate against one customer instead of spawning duplicates. No match -> a new
+// customer row is inserted. Returns null (no DB write) if the fields were left blank
+// entirely, since providing customer details at checkout is optional.
+async function resolvePosCustomer(input){
+  if (!input) return null;
+  try {
+    let existing = null;
+    if (input.phone) {
+      const { data, error } = await sb.from('customers').select('id, full_name, phone, email, loyalty_points')
+        .eq('business_id', BUSINESS_ID).eq('phone', input.phone).maybeSingle();
+      if (error) throw error;
+      existing = data;
+    }
+    if (!existing && input.email) {
+      const { data, error } = await sb.from('customers').select('id, full_name, phone, email, loyalty_points')
+        .eq('business_id', BUSINESS_ID).eq('email', input.email).maybeSingle();
+      if (error) throw error;
+      existing = data;
+    }
+    if (existing) {
+      // Fill in anything new the cashier typed this time without clobbering what's
+      // already on file (e.g. don't blank out a saved email just because this sale's
+      // form only had a phone number entered).
+      const patch = {};
+      if (input.name && input.name !== existing.full_name) patch.full_name = input.name;
+      if (input.phone && !existing.phone) patch.phone = input.phone;
+      if (input.email && !existing.email) patch.email = input.email;
+      if (Object.keys(patch).length) {
+        const { error: updErr } = await sb.from('customers').update(patch).eq('id', existing.id);
+        if (updErr) throw updErr;
+        Object.assign(existing, patch);
+      }
+      return existing;
+    }
+    const { data: inserted, error: insErr } = await sb.from('customers').insert({
+      business_id: BUSINESS_ID,
+      full_name: input.name || 'Walk-in customer',
+      phone: input.phone,
+      email: input.email,
+      loyalty_points: 0,
+    }).select('id, full_name, phone, email, loyalty_points').single();
+    if (insErr) throw insErr;
+    return inserted;
+  } catch (err) {
+    // A customer-record hiccup should never block or reverse a completed sale —
+    // the till just proceeds without a linked customer and the receipt falls
+    // back to whatever was typed on the form.
+    console.error('resolvePosCustomer failed:', err);
+    showPosToast('Sale saved, but the customer record could not be updated.', true);
+    return null;
+  }
+}
+
+/* =====================================================================================
+   RECEIPT IMAGE (JPEG) — drawn on a <canvas> from the completed sale + resolved
+   customer, then downloaded straight to the browser's Downloads/"open with" surface.
+   Purely client-side: no server dependency, so it works the same whether or not the
+   business has any messaging integration configured.
+===================================================================================== */
+function wrapReceiptText(ctx, text, maxWidth){
+  const words = String(text).split(' ');
+  const lines = [];
+  let line = '';
+  for (const w of words) {
+    const test = line ? line + ' ' + w : w;
+    if (ctx.measureText(test).width > maxWidth && line) { lines.push(line); line = w; }
+    else line = test;
+  }
+  if (line) lines.push(line);
+  return lines.length ? lines : [''];
+}
+
+function generateReceiptCanvas(r){
+  const W = 420;                 // paper width, css px
+  const GUTTER = 26;              // grey margin around the paper (the "on a table" look)
+  const PAD = 26;                 // paper's own left/right padding
+  const ROW = 19;
+  const TEETH = 16;               // torn-edge zigzag height
+  const scale = 2;                // draw at 2x for a crisper JPEG
+
+  const ctx0 = document.createElement('canvas').getContext('2d');
+  ctx0.font = '11px "IBM Plex Mono", monospace';
+
+  // ---- Build the line items up front so we can measure total paper height ----
+  const itemLines = [];
+  (r.items || []).forEach(l => {
+    const nameLines = wrapReceiptText(ctx0, l.name, W - PAD*2 - 70);
+    nameLines.forEach((t, i) => itemLines.push({
+      text: t,
+      price: i === 0 ? fmtMoney(l.price * l.qty) : '',
+      qty: i === 0 ? `x${l.qty}` : '',
+    }));
+  });
+
+  const custLines = r.customer ? [
+    r.customer.name, r.customer.phone, r.customer.email,
+  ].filter(Boolean) : [];
+
+  let y = TEETH + 22;
+  const headerH   = 30 + 18 + 16 + 10;                 // shop name + meta + "SALES RECEIPT" + gap
+  const metaH     = ROW * 3 + 10;                      // order #, date, cashier
+  const itemsH    = 16 + itemLines.length * ROW + 10;   // "Description / Price" header + rows
+  const totalsH   = ROW * 4 + 14;                       // subtotal/discount/tax + total
+  const payH      = ROW + 10;
+  const custH     = custLines.length ? (16 + custLines.length * ROW + 10) : 0;
+  const footerH   = 26 + 40 + 20 + 18;                  // THANK YOU + barcode + order# + powered-by
+  const H = y + headerH + metaH + itemsH + totalsH + payH + custH + footerH + TEETH + 14;
+
+  const canvas = document.createElement('canvas');
+  canvas.width = (W + GUTTER*2) * scale;
+  canvas.height = (H + GUTTER*2) * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+
+  // Grey backdrop the torn paper sits on.
+  ctx.fillStyle = '#d9d9d9';
+  ctx.fillRect(0, 0, W + GUTTER*2, H + GUTTER*2);
+
+  // ---- The paper itself, with a zigzag "torn" top and bottom edge ----
+  ctx.save();
+  ctx.translate(GUTTER, GUTTER);
+  ctx.beginPath();
+  ctx.moveTo(0, TEETH);
+  for (let x = 0; x <= W; x += TEETH) ctx.lineTo(x, (x / TEETH) % 2 ? 0 : TEETH);
+  ctx.lineTo(W, H - TEETH);
+  for (let x = W; x >= 0; x -= TEETH) ctx.lineTo(x, H - ((x / TEETH) % 2 ? 0 : TEETH));
+  ctx.closePath();
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = 'rgba(0,0,0,0.18)';
+  ctx.shadowBlur = 14;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.clip();
+
+  ctx.fillStyle = '#0a0a0a';
+  ctx.textBaseline = 'alphabetic';
+  const cx = W / 2;
+  y = TEETH + 26;
+
+  // Shop name + branch/business meta
+  ctx.textAlign = 'center';
+  ctx.font = '700 20px "IBM Plex Sans", sans-serif';
+  ctx.fillText(r.business || 'Shop', cx, y);
+  y += 20;
+  ctx.font = '11px "Inter", sans-serif';
+  ctx.fillStyle = '#444444';
+  if (r.branch) { ctx.fillText(r.branch, cx, y); y += 15; }
+  ctx.fillStyle = '#0a0a0a';
+  y += 6;
+
+  function dashedRule(){
+    ctx.beginPath();
+    ctx.setLineDash([3, 3]);
+    ctx.strokeStyle = '#999999';
+    ctx.moveTo(PAD, y); ctx.lineTo(W - PAD, y);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    y += 16;
+  }
+
+  ctx.font = '700 13px "IBM Plex Mono", monospace';
+  ctx.fillText(r.title || 'SALES RECEIPT', cx, y);
+  y += 12;
+  dashedRule();
+
+  // Order meta — the transaction details being "cooked in" to the receipt.
+  ctx.textAlign = 'left';
+  ctx.font = '11px "IBM Plex Mono", monospace';
+  ctx.fillStyle = '#333333';
+  const metaRow = (k, v) => {
+    ctx.textAlign = 'left'; ctx.fillText(k, PAD, y);
+    ctx.textAlign = 'right'; ctx.fillText(v, W - PAD, y);
+    y += ROW;
+  };
+  metaRow('Order #', r.orderNumber);
+  metaRow('Date', r.dateStr);
+  metaRow('Cashier', r.cashier || '—');
+  ctx.fillStyle = '#0a0a0a';
+  y += 6;
+  dashedRule();
+
+  // Item table
+  ctx.textAlign = 'left';
+  ctx.font = '700 10.5px "IBM Plex Mono", monospace';
+  ctx.fillStyle = '#555555';
+  ctx.fillText('DESCRIPTION', PAD, y);
+  ctx.textAlign = 'right';
+  ctx.fillText('PRICE', W - PAD, y);
+  ctx.fillStyle = '#0a0a0a';
+  y += 16;
+
+  ctx.font = '11px "IBM Plex Mono", monospace';
+  itemLines.forEach(line => {
+    ctx.textAlign = 'left';
+    ctx.fillText(line.text, PAD, y);
+    if (line.price) {
+      ctx.textAlign = 'right';
+      ctx.fillText(line.price, W - PAD, y);
+      ctx.font = '9.5px "IBM Plex Mono", monospace';
+      ctx.fillStyle = '#888888';
+      ctx.fillText(line.qty, W - PAD - ctx.measureText(line.price).width - 8, y);
+      ctx.fillStyle = '#0a0a0a';
+      ctx.font = '11px "IBM Plex Mono", monospace';
+    }
+    y += ROW;
+  });
+  y += 4;
+  dashedRule();
+
+  // Totals
+  const totalRow = (k, v, bold) => {
+    ctx.font = (bold ? '700 14px' : '11px') + ' "IBM Plex Mono", monospace';
+    ctx.textAlign = 'left'; ctx.fillText(k, PAD, y);
+    ctx.textAlign = 'right'; ctx.fillText(v, W - PAD, y);
+    y += bold ? ROW + 4 : ROW;
+  };
+  totalRow('Subtotal', fmtMoney(r.subtotal));
+  if (r.discount > 0) totalRow('Discount', '-' + fmtMoney(r.discount));
+  totalRow('VAT (15%)', fmtMoney(r.tax));
+  totalRow('TOTAL', fmtMoney(r.total), true);
+  y += 4;
+  dashedRule();
+
+  ctx.font = '11px "IBM Plex Mono", monospace';
+  ctx.textAlign = 'left'; ctx.fillText('Paid via', PAD, y);
+  ctx.textAlign = 'right'; ctx.fillText(r.paymentLabel || '—', W - PAD, y);
+  y += ROW + 6;
+  dashedRule();
+
+  // Customer, if any details were captured for this sale.
+  if (custLines.length) {
+    ctx.font = '700 10.5px "IBM Plex Mono", monospace';
+    ctx.fillStyle = '#555555';
+    ctx.textAlign = 'left';
+    ctx.fillText('CUSTOMER', PAD, y);
+    ctx.fillStyle = '#0a0a0a';
+    y += 16;
+    ctx.font = '11px "IBM Plex Mono", monospace';
+    custLines.forEach(l => { ctx.fillText(l, PAD, y); y += ROW; });
+    y += 4;
+    dashedRule();
+  }
+
+  // Thank-you + a decorative barcode so it reads as a real receipt at a glance.
+  ctx.textAlign = 'center';
+  ctx.font = '700 15px "IBM Plex Sans", sans-serif';
+  ctx.fillText('THANK YOU!', cx, y);
+  y += 26;
+
+  const barY = y, barH = 34;
+  let bx = cx - 90;
+  let seed = 0;
+  for (const ch of (r.orderNumber || 'RECEIPT')) seed += ch.charCodeAt(0);
+  let rnd = seed || 1;
+  const nextRnd = () => { rnd = (rnd * 9301 + 49297) % 233280; return rnd / 233280; };
+  while (bx < cx + 90) {
+    const w = 1 + Math.round(nextRnd() * 2);
+    if (nextRnd() > 0.42) { ctx.fillStyle = '#0a0a0a'; ctx.fillRect(bx, barY, w, barH); }
+    bx += w + 1;
+  }
+  y = barY + barH + 16;
+  ctx.font = '10px "IBM Plex Mono", monospace';
+  ctx.fillStyle = '#333333';
+  ctx.fillText(r.orderNumber, cx, y);
+  y += 18;
+  ctx.font = '9px "Inter", sans-serif';
+  ctx.fillStyle = '#999999';
+  ctx.fillText('Powered by GIOTRADE TECHNOLOGIES', cx, y);
+
+  ctx.restore();
+  return canvas;
+}
+
+// Generates the receipt JPEG and triggers a browser download — the "download tab"
+// the person sees is the browser's own native download UI; there is nothing further
+// to wire up server-side for this to work.
+function downloadReceiptImage(r){
+  try {
+    const canvas = generateReceiptCanvas(r);
+    canvas.toBlob(blob => {
+      if (!blob) { showPosToast('Could not generate the receipt image.', true); return; }
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `receipt-${(r.orderNumber || 'sale').replace(/[^a-z0-9-]/gi, '')}.jpg`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 4000);
+      showPosToast('Receipt downloaded — ready to share with the customer.');
+    }, 'image/jpeg', 0.92);
+  } catch (err) {
+    console.error('downloadReceiptImage failed:', err);
+    showPosToast('Sale saved, but the receipt image could not be generated.', true);
   }
 }
 
