@@ -508,14 +508,14 @@
      considered, not flat. */
   #main{ padding:26px 32px 60px; overflow-y:auto; height:100vh; position:relative;
     --font-display:'Urbanist', sans-serif; --font-body:'Urbanist', sans-serif; --font-mono:'Urbanist', sans-serif;
-    --bg:#F2F2EF; --surface:#ffffff; --surface-2:rgba(10,10,10,.035); --raised:#F8F8F5;
+    --bg:#ffffff; --surface:#ffffff; --surface-2:rgba(10,10,10,.035); --raised:#F8F8F5;
     --border:rgba(10,10,10,.09); --border-soft:rgba(10,10,10,.06);
     --text:#0a0a0a; --text-muted:rgba(10,10,10,.56); --text-dim:rgba(10,10,10,.4);
     --amber:#262626; --amber-dim:#8a8a8a;
     --amber-soft:rgba(0,0,0,.06); --amber-glow:rgba(0,0,0,.15);
     --mint:#4d4d4d; --mint-dim:#7a7a7a;
     --accent-chip:#3a3a3a;
-    background:#F2F2EF;
+    background:#ffffff;
     color:#0a0a0a;
     letter-spacing:-.005em;
   }
@@ -535,12 +535,14 @@
     background:none; -webkit-background-clip:initial; background-clip:initial;
     color:#0a0a0a; -webkit-text-fill-color:#0a0a0a; font-weight:800; letter-spacing:-.03em;
   }
-  #main .kpi-cell, #main .panel, #main .stat-card{ border-radius:20px; }
+  #main .kpi-cell, #main .panel, #main .stat-card, #main .hero-panel,
+  #main .mini-card, #main .insight-card{ border-radius:0; }
   #main .pos-product, #main .pos-cart, #main .login-card, #main .pos-search,
-  #main .pos-search-barcode{ border-radius:16px; }
+  #main .pos-search-barcode{ border-radius:0; }
   #main .kpi-cell::before, #main .panel::before, #main .stat-card::before,
   #main .hero-panel::before, #main .mini-card::before{
     background:linear-gradient(90deg, transparent, var(--accent-chip), transparent);
+    border-radius:0;
   }
   #main .mini-spark span{ background:var(--accent-chip); opacity:.9; }
   #main .kpi-cell .value, #main .stat-card .value{ font-weight:800; letter-spacing:-.02em; }
@@ -691,8 +693,7 @@
   .hero-meta{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
   .hero-sub{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
   .hero-meta .sub{ margin-top:0; }
-  .hero-chart-head{ display:flex; align-items:center; justify-content:space-between; margin-top:14px; gap:10px; flex-wrap:wrap; }
-  .hero-chart-hint{ font-size:10.5px; color:var(--text-dim); }
+  .hero-chart-head{ display:flex; align-items:center; justify-content:flex-end; margin-top:14px; gap:10px; flex-wrap:wrap; }
   .hero-horizon{ display:flex; align-items:center; gap:14px; }
   .hero-horizon-opt{
     font-size:11.5px; font-weight:600; color:var(--text-dim); padding-bottom:2px;
@@ -800,6 +801,125 @@
   .period-dd-option.active{ color:var(--amber); font-weight:700; background:var(--amber-soft); }
   .pc-loading{ opacity:.4; letter-spacing:2px; }
   .pc-sub{ min-height:16px; }
+
+  /* ---------------- Trading heatmap (hour × day) ---------------- */
+  .heatmap-card{
+    margin-top:14px; background:var(--raised); border:1px solid var(--border); border-radius:16px;
+    padding:20px 20px 16px; box-shadow:inset 0 1px 0 rgba(255,255,255,.6);
+  }
+  .heatmap-wrap{ overflow-x:auto; padding-top:36px; padding-bottom:2px; }
+  .heatmap-grid{ display:grid; grid-template-columns:44px repeat(24, minmax(0, 1fr)) 62px; gap:5px; min-width:640px; width:100%; }
+  .heatmap-row{ display:contents; }
+  .heatmap-hour-label{ font-size:10px; color:var(--text-dim); text-align:center; align-self:center; font-family:var(--font-mono); font-weight:600; }
+  .heatmap-row-label{
+    font-size:11.5px; color:var(--text-muted); font-weight:700; align-self:center; padding-right:8px;
+    transition:color .15s;
+  }
+  .heatmap-row:hover .heatmap-row-label{ color:var(--text); }
+  .heatmap-total-label{
+    font-size:10.5px; color:var(--text-dim); align-self:center; padding-left:8px; font-family:var(--font-mono);
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis; transition:color .15s;
+  }
+  .heatmap-row:hover .heatmap-total-label{ color:var(--text-muted); }
+  .heatmap-cell{
+    aspect-ratio:1/1; border-radius:6px; position:relative; cursor:default;
+    box-shadow:inset 0 0 0 1px rgba(10,10,10,.045);
+    transition:transform .12s ease, box-shadow .12s ease, outline-color .12s ease;
+  }
+  .heatmap-row:hover .heatmap-cell{ box-shadow:inset 0 0 0 1px rgba(10,10,10,.09); }
+  .heatmap-cell:hover{ transform:scale(1.22); box-shadow:0 6px 16px -4px rgba(0,0,0,.4); z-index:2; }
+  .heatmap-cell:hover::after{
+    content:attr(data-tip); position:absolute; bottom:calc(100% + 7px); left:50%; transform:translateX(-50%);
+    background:#111111; color:#fff; font-size:11px; padding:7px 10px; border-radius:7px; white-space:nowrap;
+    pointer-events:none; z-index:5; box-shadow:0 10px 22px -8px rgba(0,0,0,.5);
+  }
+  .heatmap-cell.edge-left:hover::after{ left:0; transform:translateX(0); }
+  .heatmap-cell.edge-right:hover::after{ left:auto; right:0; transform:translateX(0); }
+  .heatmap-legend{
+    display:flex; align-items:center; gap:8px; margin-top:16px; padding-top:14px;
+    border-top:1px solid var(--border-soft); font-size:11.5px; color:var(--text-dim);
+  }
+  .heatmap-legend .hl-scale{ display:flex; gap:3px; }
+  .heatmap-legend .hl-swatch{ width:18px; height:13px; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(10,10,10,.06); }
+
+  /* ---------------- Intelligent analytics ---------------- */
+  .insight-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-top:14px; }
+  .insight-card{ position:relative; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:15px 17px; overflow:hidden; }
+  .insight-card::before{ content:''; position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--insight-accent, var(--text-dim)); }
+  .insight-card .ic-head{ display:flex; align-items:center; gap:8px; margin-bottom:8px; }
+  .insight-card .ic-icon{ width:26px; height:26px; border-radius:8px; display:flex; align-items:center; justify-content:center; background:var(--raised); flex-shrink:0; }
+  .insight-card .ic-icon svg{ width:14px; height:14px; color:var(--insight-accent, var(--text-muted)); }
+  .insight-card .ic-label{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.09em; font-weight:700; }
+  .insight-card .ic-headline{ font-family:var(--font-display); font-size:18px; font-weight:800; letter-spacing:-.01em; margin-bottom:4px; }
+  .insight-card .ic-body{ font-size:12px; line-height:1.55; color:var(--text-muted); }
+  .insight-card .ic-tag{ display:inline-flex; align-items:center; gap:4px; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.06em; padding:2px 8px; border-radius:20px; margin-bottom:8px; background:var(--raised); color:var(--insight-accent, var(--text-muted)); }
+
+  /* ---------------- Payment method mix (donut) ---------------- */
+  .payment-mix-body{ display:flex; align-items:center; gap:22px; margin-top:6px; flex-wrap:wrap; }
+  .payment-donut-wrap{ position:relative; width:150px; height:150px; flex-shrink:0; }
+  .payment-donut-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; pointer-events:none; }
+  .pdc-value{ font-family:var(--font-display); font-size:22px; font-weight:800; letter-spacing:-.01em; }
+  .pdc-label{ font-size:9.5px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.1em; margin-top:2px; }
+  .payment-legend{ flex:1; min-width:160px; display:flex; flex-direction:column; gap:10px; }
+  .pl-row{ display:flex; align-items:center; gap:9px; font-size:12.5px; }
+  .pl-swatch{ width:10px; height:10px; border-radius:3px; flex-shrink:0; }
+  .pl-name{ flex:1; text-transform:capitalize; color:var(--text); }
+  .pl-pct{ font-family:var(--font-mono); color:var(--text-muted); font-size:11.5px; }
+
+  /* ---------------- Growth target ring ---------------- */
+  .growth-target-body{ display:flex; align-items:center; gap:24px; margin-top:6px; flex-wrap:wrap; }
+  .gt-ring-wrap{ position:relative; width:120px; height:120px; flex-shrink:0; }
+  .gt-ring{ width:120px; height:120px; transform:rotate(-90deg); }
+  .gt-ring-track{ fill:none; stroke:var(--border); stroke-width:10; }
+  .gt-ring-progress{
+    fill:none; stroke:#1a1a1a; stroke-width:10; stroke-linecap:round;
+    stroke-dasharray:326.7; stroke-dashoffset:326.7; transition:stroke-dashoffset .8s cubic-bezier(.2,.8,.2,1);
+  }
+  .gt-ring-center{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; }
+  .gt-pct{ font-family:var(--font-display); font-size:21px; font-weight:800; letter-spacing:-.01em; }
+  .gt-pct-label{ font-size:9px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.1em; margin-top:1px; }
+  .gt-stats{ flex:1; min-width:170px; display:flex; flex-direction:column; gap:10px; }
+  .gt-stat-row{ display:flex; justify-content:space-between; align-items:baseline; font-size:12.5px; }
+  .gt-stat-row .gt-stat-label{ color:var(--text-muted); }
+  .gt-stat-row .gt-stat-value{ font-family:var(--font-mono); font-weight:700; }
+  .gt-edit-btn{
+    display:flex; align-items:center; gap:5px; font-size:11px; font-weight:600; color:var(--text-muted);
+    background:var(--raised); border:1px solid var(--border); border-radius:20px; padding:5px 11px 5px 9px;
+    transition:color .12s ease, border-color .12s ease;
+  }
+  .gt-edit-btn svg{ width:12px; height:12px; }
+  .gt-edit-btn:hover{ color:var(--text); border-color:var(--text-dim); }
+  .gt-editor{
+    display:none; margin-top:14px; padding-top:14px; border-top:1px dashed var(--border);
+    flex-wrap:wrap; align-items:flex-end; gap:12px;
+  }
+  .gt-editor.open{ display:flex; }
+  .gt-editor-field{ display:flex; flex-direction:column; gap:6px; }
+  .gt-editor-field label{ font-size:10px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.08em; font-weight:700; }
+  .gt-editor-field select, .gt-editor-field input{
+    background:var(--surface-2); border:1px solid var(--border); color:var(--text); border-radius:9px;
+    padding:8px 10px; font-size:12.5px; font-family:inherit; min-width:130px;
+  }
+  .gt-editor-field select:focus, .gt-editor-field input:focus{ outline:none; border-color:var(--text-dim); }
+  .gt-editor-actions{ display:flex; gap:8px; }
+  .gt-editor-actions button{
+    font-size:12px; font-weight:700; padding:8px 14px; border-radius:9px; border:1px solid transparent;
+  }
+  .gt-save-btn{ background:var(--text); color:#000; }
+  .gt-save-btn:hover{ opacity:.88; }
+  .gt-reset-btn{ background:none; border-color:var(--border); color:var(--text-muted); }
+  .gt-reset-btn:hover{ color:var(--text); border-color:var(--text-dim); }
+  .gt-editor-hint{ width:100%; font-size:10.5px; color:var(--text-dim); margin-top:-4px; }
+  .gt-preset-row{ display:flex; flex-wrap:wrap; gap:7px; width:100%; }
+  .gt-preset-chip{
+    font-size:11.5px; font-weight:600; padding:6px 12px; border-radius:20px;
+    border:1px solid var(--border); background:var(--surface-2); color:var(--text-muted);
+    transition:border-color .12s ease, color .12s ease, background .12s ease;
+  }
+  .gt-preset-chip:hover{ border-color:var(--text-dim); color:var(--text); }
+  .gt-preset-chip.active{ background:var(--text); border-color:var(--text); color:#000; }
+  .gt-editor-preview{ width:100%; font-size:11.5px; color:var(--text-muted); min-height:14px; }
+  .gt-empty-note{ font-size:11.5px; color:var(--text-dim); line-height:1.5; margin-top:2px; }
 
   /* ---------------- Tables ---------------- */
   table{ width:100%; border-collapse:collapse; font-size:13px; }
@@ -1219,7 +1339,6 @@
           </div>
 
           <div class="hero-chart-head">
-            <span class="hero-chart-hint">Bars = period totals · line = trend</span>
             <div class="hero-horizon" id="hero-horizon">
               <button type="button" class="hero-horizon-opt active" data-horizon="week">Week</button>
               <button type="button" class="hero-horizon-opt" data-horizon="month">Month</button>
@@ -1242,7 +1361,6 @@
 
         <div class="panel-head" style="margin-top:24px;">
           <h3>Sales &amp; order performance</h3>
-          <span class="hint" id="perf-period-hint">completed orders · period set per card</span>
         </div>
         <div class="kpi-row" id="kpi-row-performance" style="grid-template-columns:repeat(auto-fit, minmax(160px, 1fr));">
           <!-- filled by JS -->
@@ -1253,7 +1371,7 @@
             <h3>Peak trading analytics</h3>
             <span class="hint">last 28 days · completed orders</span>
           </div>
-          <div id="peak-insight" style="background:var(--amber-soft); border:1px solid var(--border); border-left:3px solid var(--amber); border-radius:10px; padding:14px 16px; font-size:13px; line-height:1.6; color:var(--text);">—</div>
+          <div id="peak-insight" style="background:var(--amber-soft); border:1px solid var(--border); border-left:3px solid var(--amber); border-radius:0; padding:14px 16px; font-size:13px; line-height:1.6; color:var(--text);">—</div>
           <div class="grid cols-3" id="peak-stats" style="margin-top:14px;">
             <!-- filled by JS -->
           </div>
@@ -1265,6 +1383,96 @@
             <div>
               <div class="panel-head" style="margin-bottom:10px;"><h3 style="font-size:12.5px;">Sales distribution by day of week</h3></div>
               <div style="height:270px;"><canvas id="dow-chart"></canvas></div>
+            </div>
+          </div>
+
+          <div class="panel-head" style="margin-top:22px;">
+            <h3 style="font-size:12.5px;">Trading heatmap</h3>
+          </div>
+          <div class="heatmap-card">
+            <div id="sales-heatmap" class="heatmap-wrap"></div>
+          </div>
+        </div>
+
+        <!-- ============ INTELLIGENT ANALYTICS: auto-generated insights ============ -->
+        <div class="panel" style="margin-top:16px;">
+          <div class="panel-head">
+            <h3>Intelligent analytics</h3>
+            <span class="hint">last <span id="insights-days-hint"></span> days · auto-generated</span>
+          </div>
+          <div id="insight-grid" class="insight-grid">
+            <!-- filled by JS -->
+          </div>
+        </div>
+
+        <!-- ============ ADVANCED ANALYTICS: order outcomes + growth target ============ -->
+        <div class="grid cols-2" style="margin-top:16px;">
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Order outcomes</h3>
+              <span class="hint">last 28 days · all orders</span>
+            </div>
+            <div id="outcomes-insight" class="muted" style="font-size:12px; margin-bottom:12px;">—</div>
+            <div class="payment-mix-body">
+              <div class="payment-donut-wrap"><canvas id="outcomes-chart"></canvas>
+                <div class="payment-donut-center" id="outcomes-donut-center">
+                  <div class="pdc-value" id="oc-value">—</div>
+                  <div class="pdc-label">orders</div>
+                </div>
+              </div>
+              <div id="outcomes-legend" class="payment-legend"></div>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <h3>Growth target</h3>
+              <div style="display:flex; align-items:center; gap:10px;">
+                <span class="hint" id="gt-hint">month-to-date vs goal</span>
+                <button type="button" class="gt-edit-btn" id="gt-edit-toggle">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                  Set goal
+                </button>
+              </div>
+            </div>
+            <div id="growth-target-body" class="growth-target-body">
+              <div class="gt-ring-wrap">
+                <svg viewBox="0 0 120 120" class="gt-ring">
+                  <circle cx="60" cy="60" r="52" class="gt-ring-track"/>
+                  <circle cx="60" cy="60" r="52" class="gt-ring-progress" id="gt-ring-progress"/>
+                </svg>
+                <div class="gt-ring-center">
+                  <div class="gt-pct" id="gt-pct">—</div>
+                  <div class="gt-pct-label">of goal</div>
+                </div>
+              </div>
+              <div class="gt-stats" id="gt-stats"></div>
+            </div>
+            <div class="gt-editor" id="gt-editor">
+              <div class="gt-preset-row" id="gt-preset-row">
+                <button type="button" class="gt-preset-chip" data-mode="pct" data-value="5">+5%</button>
+                <button type="button" class="gt-preset-chip" data-mode="pct" data-value="10">+10%</button>
+                <button type="button" class="gt-preset-chip" data-mode="pct" data-value="15">+15%</button>
+                <button type="button" class="gt-preset-chip" data-mode="pct" data-value="20">+20%</button>
+                <button type="button" class="gt-preset-chip" data-mode="fixed" data-value="">Fixed amount…</button>
+              </div>
+              <div class="gt-editor-field">
+                <label for="gt-mode-select">Goal type</label>
+                <select id="gt-mode-select">
+                  <option value="pct">% growth vs last month</option>
+                  <option value="fixed">Fixed monthly target</option>
+                </select>
+              </div>
+              <div class="gt-editor-field">
+                <label for="gt-value-input" id="gt-value-label">Growth %</label>
+                <input type="number" id="gt-value-input" min="0" step="1" placeholder="10"/>
+              </div>
+              <div class="gt-editor-preview" id="gt-editor-preview"></div>
+              <div class="gt-editor-actions">
+                <button type="button" class="gt-save-btn" id="gt-save-btn">Save goal</button>
+                <button type="button" class="gt-reset-btn" id="gt-reset-btn">Reset to default</button>
+              </div>
+              <div class="gt-editor-hint">Saved on this device for this business · compares actual calendar-month-to-date sales against last calendar month, defaults to +10% when no custom goal is set.</div>
             </div>
           </div>
         </div>
@@ -1280,7 +1488,21 @@
         <div class="panel" style="margin-top:16px;">
           <div class="panel-head">
             <h3>Top selling items</h3>
-            <span class="hint">by revenue · last 14 days</span>
+            <div style="display:flex; align-items:center; gap:10px;">
+              <span class="hint" id="top-products-hint">by revenue · last 7 days</span>
+              <div class="period-dd" data-key="top_products">
+                <button type="button" class="period-dd-trigger">
+                  <span class="pd-current">Weekly</span>
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 9l6 6 6-6"/></svg>
+                </button>
+                <div class="period-dd-menu" id="top-products-period-menu">
+                  <button type="button" class="period-dd-option" data-key="top_products" data-period="3months">3 Months</button>
+                  <button type="button" class="period-dd-option" data-key="top_products" data-period="month">Month</button>
+                  <button type="button" class="period-dd-option active" data-key="top_products" data-period="week">Weekly</button>
+                  <button type="button" class="period-dd-option" data-key="top_products" data-period="day">Daily</button>
+                </div>
+              </div>
+            </div>
           </div>
           <div id="top-products-list"></div>
         </div>
@@ -1442,7 +1664,7 @@
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
               </span>
             </button>
-            <div id="pos-error" style="display:none; margin-top:12px; font-size:12px; color:var(--red); background:rgba(242,85,90,.1); border:1px solid var(--red-dim); border-radius:8px; padding:10px 12px; line-height:1.5;"></div>
+            <div id="pos-error" style="display:none; margin-top:12px; font-size:12px; color:var(--red); background:rgba(242,85,90,.1); border:1px solid var(--red-dim); border-radius:0; padding:10px 12px; line-height:1.5;"></div>
           </aside>
         </div>
       </section>
@@ -1872,11 +2094,21 @@ let CURRENT_ROLE = null; // role of whoever is currently active on this terminal
 let salesChart = null;
 let hourChart = null;
 let dowChart = null;
+let outcomesChart = null;
 const ANALYTICS_DAYS = 28; // window used for sales performance + peak trading analytics
 let cache = { orders: [], products: [], customers: [], inventory: [], expenses: [] };
 let STAFF_DIRECTORY = []; // { id, full_name, role, pin_hash } for cashier/kitchen staff in this business — powers Switch User / Manage PINs
 
 const fmtMoney = (n) => new Intl.NumberFormat('en-ZA', { style:'currency', currency: CURRENCY }).format(Number(n||0));
+// Compact form for tight spaces (e.g. the heatmap's per-row totals) — "R17.2k" instead
+// of "R17 234.50". Falls back to fmtMoney if the browser lacks compact-notation support.
+const fmtMoneyCompact = (n) => {
+  try {
+    return new Intl.NumberFormat('en-ZA', { style:'currency', currency: CURRENCY, notation:'compact', maximumFractionDigits:1 }).format(Number(n||0));
+  } catch (err) {
+    return fmtMoney(n);
+  }
+};
 const fmtDate = (d) => d ? new Date(d).toLocaleDateString('en-ZA', { day:'2-digit', month:'short', year:'numeric' }) : '—';
 const fmtDateTime = (d) => d ? new Date(d).toLocaleString('en-ZA', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' }) : '—';
 const esc = (s) => (s ?? '').toString().replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -2601,6 +2833,7 @@ async function loadAll(){
     ['sales chart', loadSalesChart],
     ['top products', loadTopProducts],
     ['trading analytics', loadTradingAnalytics],
+    ['growth target', loadGrowthTarget],
     ['orders', loadOrders],
     ['products', loadProducts],
     ['inventory', loadInventory],
@@ -2628,11 +2861,12 @@ async function loadAll(){
   initPos();
   wireTillModals();
   wireAddProductModal();
+  wireGrowthTargetEditor();
 }
 
 function showLoadWarning(failures){
   const box = document.createElement('div');
-  box.style.cssText = 'background:rgba(229,72,77,0.1); border:1px solid var(--red-dim); color:var(--red); border-radius:10px; padding:12px 16px; margin-bottom:18px; font-size:12.5px; line-height:1.6;';
+  box.style.cssText = 'background:rgba(229,72,77,0.1); border:1px solid var(--red-dim); color:var(--red); border-radius:0; padding:12px 16px; margin-bottom:18px; font-size:12.5px; line-height:1.6;';
   box.innerHTML = `<strong>${failures.length} section(s) failed to load</strong><br/>` +
     failures.map(f => `${esc(f.name)}: ${esc(f.r.reason?.message || String(f.r.reason))}`).join('<br/>') +
     `<br/><span style="opacity:.75;">Open the browser console (F12) for full details.</span>`;
@@ -2735,6 +2969,7 @@ const cardPeriod = {
   orders_per_hour: 'month',
   avg_items_order: 'month',
   sales_growth: 'week',
+  top_products: 'week',
 };
 
 let periodBucketCache = {}; // periodKey -> Promise<{current, previous}>
@@ -2916,7 +3151,7 @@ function wirePeriodDropdowns(){
       dd.querySelector('.pd-current').textContent = PERIODS[period].menuLabel;
       dd.querySelectorAll('.period-dd-option').forEach(o => o.classList.toggle('active', o.dataset.period === period));
       dd.classList.remove('open');
-      refreshMetricCard(key);
+      if (key === 'top_products') loadTopProducts(); else refreshMetricCard(key);
       e.stopPropagation();
       return;
     }
@@ -3057,23 +3292,25 @@ function buildHeroSeries(horizonKey){
     days.push(d);
   }
 
-  let labels, revArr, ordArr;
+  let labels, revArr, ordArr, pointDates;
   if (horizon.bucket === 'day') {
     labels = days.map(d => d.toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }));
     revArr = days.map(d => lookup(d).revenue);
     ordArr = days.map(d => lookup(d).orders);
+    pointDates = days.map(d => new Date(d));
   } else if (horizon.bucket === 'week') {
     const buckets = [];
     for (let i = 0; i < days.length; i += 7) buckets.push(days.slice(i, i + 7));
     labels = buckets.map(b => b[0].toLocaleDateString('en-ZA', { day:'2-digit', month:'short' }));
     revArr = buckets.map(b => b.reduce((s,d) => s + lookup(d).revenue, 0));
     ordArr = buckets.map(b => b.reduce((s,d) => s + lookup(d).orders, 0));
+    pointDates = buckets.map(b => new Date(b[0]));
   } else { // month
     const order = [];
     const byMonth = {};
     days.forEach(d => {
       const key = `${d.getFullYear()}-${d.getMonth()}`;
-      if (!byMonth[key]) { byMonth[key] = { label:d.toLocaleDateString('en-ZA', { month:'short' }), revenue:0, orders:0 }; order.push(key); }
+      if (!byMonth[key]) { byMonth[key] = { label:d.toLocaleDateString('en-ZA', { month:'short' }), revenue:0, orders:0, date:new Date(d) }; order.push(key); }
       const rec = lookup(d);
       byMonth[key].revenue += rec.revenue;
       byMonth[key].orders += rec.orders;
@@ -3081,27 +3318,44 @@ function buildHeroSeries(horizonKey){
     labels = order.map(k => byMonth[k].label);
     revArr = order.map(k => byMonth[k].revenue);
     ordArr = order.map(k => byMonth[k].orders);
+    pointDates = order.map(k => byMonth[k].date);
   }
 
   const avgArr = ordArr.map((o,i) => o > 0 ? revArr[i] / o : 0);
   const sum = (arr) => arr.reduce((s,v) => s + v, 0);
-  const mid = Math.max(1, Math.floor(labels.length / 2));
-  const firstHalf = (arr) => sum(arr.slice(0, mid));
-  const secondHalf = (arr) => sum(arr.slice(mid));
+
+  // Prior-period comparison: the full, unfiltered daily history already sitting in
+  // RAW_DAILY lets us look one whole horizon-length further back and total up the
+  // actual preceding period (prior 7 days, prior month, prior quarter, prior year) —
+  // rather than splitting the currently-displayed window in half and comparing the
+  // two halves against each other, which is noisier and isn't really "prior period".
+  const priorDays = [];
+  for (let i = horizon.days * 2 - 1; i >= horizon.days; i--) {
+    const d = new Date(); d.setDate(d.getDate() - i);
+    priorDays.push(d);
+  }
+  const priorRevenue = priorDays.reduce((s, d) => s + lookup(d).revenue, 0);
+  const priorOrders = priorDays.reduce((s, d) => s + lookup(d).orders, 0);
+  const priorAvg = priorOrders > 0 ? priorRevenue / priorOrders : 0;
+
+  const curOrders = sum(ordArr);
+  const curAvg = curOrders > 0 ? sum(revArr) / curOrders : 0;
 
   HERO = {
     labels,
     horizonLabel: horizon.label,
+    bucket: horizon.bucket,
+    pointDates,
     series: { sales: revArr, transactions: ordArr, avg: avgArr },
     totals: {
       sales: sum(revArr),
-      transactions: sum(ordArr),
-      avg: sum(ordArr) > 0 ? sum(revArr) / sum(ordArr) : 0,
+      transactions: curOrders,
+      avg: curAvg,
     },
     deltas: {
-      sales: pctChangeGlobal(secondHalf(revArr), firstHalf(revArr)),
-      transactions: pctChangeGlobal(secondHalf(ordArr), firstHalf(ordArr)),
-      avg: pctChangeGlobal(secondHalf(avgArr), firstHalf(avgArr)),
+      sales: pctChangeGlobal(sum(revArr), priorRevenue),
+      transactions: pctChangeGlobal(curOrders, priorOrders),
+      avg: pctChangeGlobal(curAvg, priorAvg),
     },
   };
 }
@@ -3124,8 +3378,35 @@ function setHeroMetric(metric){
   const deltaEl = document.getElementById('hero-delta');
   if (valueEl) valueEl.textContent = meta.fmt(HERO.totals[metric]);
   if (subEl) subEl.textContent = `${meta.label} · last ${HERO.horizonLabel.toLowerCase()}`;
-  if (deltaEl) deltaEl.innerHTML = deltaBadge(HERO.deltas[metric], 'vs prior period');
+  if (deltaEl) deltaEl.innerHTML = deltaBadge(HERO.deltas[metric], `vs prior ${HERO.horizonLabel.toLowerCase()}`);
   renderHeroChart(metric);
+}
+
+/* -------- Day-of-week seasonal index, built from the full unlimited sales history
+   in RAW_DAILY (not just the currently displayed window) — so even a 7-day "Week"
+   view benefits from whatever weekly pattern the business has established over
+   time. Used to deseasonalize the series before fitting a trend, then reseasonalize
+   the forecast, so a run of Saturdays isn't mistaken for underlying growth. Returns
+   null (fall back to a flat trend fit) when there isn't real coverage across all
+   seven weekdays yet — better no seasonal claim than one from thin data. -------- */
+function computeDowSeasonalIndex(metric){
+  const byDow = Array.from({ length: 7 }, () => []);
+  RAW_DAILY.forEach(r => {
+    const d = new Date(r.sale_date + 'T00:00:00');
+    if (isNaN(d.getTime())) return;
+    const revenue = Number(r.total_revenue || 0);
+    const orders = Number(r.order_count || 0);
+    let val;
+    if (metric === 'transactions') val = orders;
+    else if (metric === 'avg') val = orders > 0 ? revenue / orders : null;
+    else val = revenue;
+    if (val !== null) byDow[d.getDay()].push(val);
+  });
+  if (byDow.some(arr => arr.length < 3)) return null;
+  const means = byDow.map(arr => arr.reduce((s,v) => s + v, 0) / arr.length);
+  const overall = means.reduce((s,v) => s + v, 0) / 7;
+  if (overall <= 0) return null;
+  return means.map(m => m / overall);
 }
 
 function renderHeroChart(metric){
@@ -3148,8 +3429,71 @@ function renderHeroChart(metric){
     return slice.reduce((s,v) => s + v, 0) / slice.length;
   });
 
+  // ---- Forecast: trend + seasonality, not a naive straight-line extrapolation ----
+  // Only daily-bucketed horizons (Week/Month) carry a meaningful day-of-week signal
+  // — Quarter/Year buckets already aggregate across weekdays, so seasonality is
+  // skipped there. Where it applies: pull the weekly pattern out of the real series
+  // first (deseasonalize), fit the trend on what's left, then multiply the future
+  // weekday's seasonal factor back in — so a forecasted Saturday looks like a
+  // Saturday, not a flat continuation of Tuesday's numbers.
+  const dowIndex = HERO.bucket === 'day' ? computeDowSeasonalIndex(metric) : null;
+  const deseasoned = values.map((v, i) => {
+    if (!dowIndex) return v;
+    const idx = dowIndex[HERO.pointDates[i].getDay()] || 1;
+    return idx > 0 ? v / idx : v;
+  });
+  const deseasonedTrend = deseasoned.map((_, i) => {
+    const lo = Math.max(0, i - 1), hi = Math.min(deseasoned.length - 1, i + 1);
+    const slice = deseasoned.slice(lo, hi + 1);
+    return slice.reduce((s,v) => s + v, 0) / slice.length;
+  });
+
+  const FORECAST_COUNT = 3;
+  // Longer fit window than before (up to 14/8 points vs. a fixed 6) so the trend
+  // isn't set by a handful of recent points alone, combined with recency
+  // weighting (below) so it still responds to a genuine recent shift.
+  const fitWindow = Math.min(HERO.bucket === 'day' ? 14 : 8, deseasonedTrend.length);
+  let forecastValues = [];
+  if (fitWindow >= 3) {
+    const slice = deseasonedTrend.slice(-fitWindow);
+    const n = slice.length;
+    const xs = slice.map((_, i) => i);
+    // Weighted least squares: the most recent point in the window carries full
+    // weight, each step further back decays — an unusual day from two weeks ago
+    // no longer swings the projection as much as what happened yesterday.
+    const weights = xs.map(i => Math.pow(0.88, n - 1 - i));
+    const wSum = weights.reduce((s,w) => s + w, 0);
+    const wSumX = xs.reduce((s,x,i) => s + weights[i]*x, 0);
+    const wSumY = slice.reduce((s,y,i) => s + weights[i]*y, 0);
+    const wSumXY = xs.reduce((s,x,i) => s + weights[i]*x*slice[i], 0);
+    const wSumXX = xs.reduce((s,x,i) => s + weights[i]*x*x, 0);
+    const denom = (wSum*wSumXX - wSumX*wSumX) || 1;
+    const slope = (wSum*wSumXY - wSumX*wSumY) / denom;
+    const intercept = (wSumY - slope*wSumX) / wSum;
+    for (let i = 0; i < FORECAST_COUNT; i++) {
+      const x = n - 1 + (i + 1);
+      let val = Math.max(0, slope*x + intercept);
+      if (dowIndex) {
+        const futureDate = new Date(HERO.pointDates[HERO.pointDates.length - 1]);
+        futureDate.setDate(futureDate.getDate() + (i + 1));
+        val *= (dowIndex[futureDate.getDay()] || 1);
+      }
+      forecastValues.push(val);
+    }
+  } else {
+    forecastValues = Array(FORECAST_COUNT).fill(trend[trend.length - 1] || 0);
+  }
+
+  const realCount = labels.length;
+  const extLabels = [...labels, ...forecastValues.map((_, i) => `Proj. ${i+1}`)];
+  const extBarData = [...values, ...forecastValues.map(() => null)];
+  // Bridge point: the line must start its dashed run exactly at the last real point,
+  // so the connecting segment (last real → first forecast) carries real trend data too.
+  const extTrendData = [...trend, ...forecastValues];
+
   const barColor = 'rgba(10,10,10,0.09)';
   const lineColor = '#0a0a0a';
+  const forecastColor = 'rgba(10,10,10,0.4)';
   const tickColor = 'rgba(10,10,10,0.45)';
   const gridColor = 'rgba(10,10,10,0.07)';
 
@@ -3157,12 +3501,18 @@ function renderHeroChart(metric){
   salesChart = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels,
+      labels: extLabels,
       datasets: [
-        { type:'bar', data:values, backgroundColor:barColor, borderRadius:3, borderSkipped:false,
+        { type:'bar', data:extBarData, backgroundColor:barColor, borderRadius:3, borderSkipped:false,
           barPercentage:0.55, categoryPercentage:0.9, order:2 },
-        { type:'line', data:trend, borderColor:lineColor, borderWidth:1.5, tension:0.4, pointRadius:0,
-          pointHoverRadius:4, pointHoverBackgroundColor:lineColor, pointHoverBorderColor:'#ffffff', fill:false, order:1 },
+        { type:'line', data:extTrendData, borderWidth:1.5, tension:0.4, pointRadius:0,
+          pointHoverRadius:(ctx) => ctx.dataIndex >= realCount - 1 ? 0 : 4,
+          pointHoverBackgroundColor:lineColor, pointHoverBorderColor:'#ffffff', fill:false, order:1,
+          segment: {
+            borderColor: (segCtx) => segCtx.p0DataIndex >= realCount - 1 ? forecastColor : lineColor,
+            borderDash: (segCtx) => segCtx.p0DataIndex >= realCount - 1 ? [5,4] : undefined,
+          },
+        },
       ]
     },
     options: {
@@ -3171,7 +3521,12 @@ function renderHeroChart(metric){
       plugins: { legend: { display:false }, tooltip: {
         backgroundColor:'#111111', borderWidth:0, titleColor:'#ffffff', bodyColor:'#ffffff',
         padding:10, cornerRadius:8, displayColors:false,
-        callbacks: { label: (c) => meta.fmt(c.parsed.y) }
+        filter: (item) => !(item.datasetIndex === 0 && item.dataIndex >= realCount),
+        callbacks: {
+          label: (c) => c.dataIndex >= realCount
+            ? `Projected: ${meta.fmt(c.parsed.y)}`
+            : meta.fmt(c.parsed.y)
+        }
       }},
       scales: {
         x: { grid: { display:false }, ticks: { color:tickColor, font:{ family:'Urbanist', size:10 }, maxRotation:0, autoSkip:true } },
@@ -3193,28 +3548,58 @@ function wireHeroToggle(){
   });
 }
 
+/* -------- Top selling items: now period-selectable (Daily/Weekly/Month/3 Months) --------
+   Queries order_items directly (joined to orders for the date filter, and products for
+   the display name) rather than the fixed view_top_products view, since the view has no
+   way to take a caller-supplied window. Ranked by revenue (line subtotal, pre-tax). */
 async function loadTopProducts(){
-  const { data, error } = await sb
-    .from('view_top_products')
-    .select('*')
-    .eq('business_id', BUSINESS_ID)
-    .order('revenue_rank', { ascending: true })
-    .limit(5);
-  assertNoError(error, 'top products');
-
   const el = document.getElementById('top-products-list');
-  if (!data || !data.length) { el.innerHTML = emptyState('No completed sales yet.'); return; }
-  const max = Math.max(...data.map(d => Number(d.total_revenue || 0)));
-  el.innerHTML = data.map(p => `
-    <div style="margin-bottom:12px;">
-      <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;">
-        <span>${esc(p.product_name)}</span>
-        <span class="mono muted">${fmtMoney(p.total_revenue)}</span>
-      </div>
-      <div style="height:5px; background:var(--raised); border-radius:3px; overflow:hidden;">
-        <div style="height:100%; width:${max ? (p.total_revenue/max*100) : 0}%; background:var(--mint);"></div>
-      </div>
-    </div>`).join('');
+  const hintEl = document.getElementById('top-products-hint');
+  if (!el) return;
+  const periodKey = cardPeriod.top_products || 'week';
+  const def = PERIODS[periodKey];
+  if (hintEl) hintEl.textContent = periodKey === 'day' ? 'by revenue · today' : `by revenue · last ${def.shortLabel}`;
+  el.innerHTML = `<div class="pc-loading" style="padding:6px 0;">···</div>`;
+
+  const since = new Date();
+  if (periodKey === 'day') since.setHours(0,0,0,0);
+  else since.setDate(since.getDate() - def.days);
+
+  try {
+    const { data, error } = await sb
+      .from('order_items')
+      .select('quantity, subtotal, product_id, products(name), orders!inner(business_id, status, created_at)')
+      .eq('business_id', BUSINESS_ID)
+      .eq('orders.status', 'completed')
+      .gte('orders.created_at', since.toISOString());
+    assertNoError(error, 'top products');
+
+    const byProduct = {};
+    (data || []).forEach(it => {
+      const key = it.product_id || 'unknown';
+      const p = byProduct[key] || { name: it.products?.name || 'Unknown item', revenue: 0, qty: 0 };
+      p.revenue += Number(it.subtotal || 0);
+      p.qty += Number(it.quantity || 0);
+      byProduct[key] = p;
+    });
+    const ranked = Object.values(byProduct).sort((a, b) => b.revenue - a.revenue).slice(0, 5);
+
+    if (!ranked.length) { el.innerHTML = emptyState(`No completed sales ${periodKey === 'day' ? 'today' : `in the last ${def.shortLabel}`}.`); return; }
+    const max = Math.max(...ranked.map(p => p.revenue));
+    el.innerHTML = ranked.map(p => `
+      <div style="margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; font-size:12.5px; margin-bottom:5px;">
+          <span>${esc(p.name)} <span class="muted">· ${p.qty} sold</span></span>
+          <span class="mono muted">${fmtMoney(p.revenue)}</span>
+        </div>
+        <div style="height:5px; background:var(--raised); border-radius:3px; overflow:hidden;">
+          <div style="height:100%; width:${max ? (p.revenue/max*100) : 0}%; background:var(--mint);"></div>
+        </div>
+      </div>`).join('');
+  } catch (err) {
+    el.innerHTML = emptyState('Failed to load top selling items.');
+    console.warn('top products failed to load:', err.message || err);
+  }
 }
 
 /* =====================================================================================
@@ -3231,9 +3616,9 @@ async function loadTradingAnalytics(){
   since.setDate(since.getDate() - ANALYTICS_DAYS);
   since.setHours(0,0,0,0);
 
-  const [ordersRes, itemsRes] = await Promise.all([
+  const [ordersRes, itemsRes, allOrdersRes, stockRes] = await Promise.all([
     sb.from('orders')
-      .select('branch_id, subtotal, discount_amount, total_amount, created_at, branches(name)')
+      .select('branch_id, customer_id, subtotal, discount_amount, total_amount, payment_method, created_at, branches(name), profiles(full_name)')
       .eq('business_id', BUSINESS_ID)
       .eq('status', 'completed')
       .gte('created_at', since.toISOString()),
@@ -3242,15 +3627,27 @@ async function loadTradingAnalytics(){
       .eq('business_id', BUSINESS_ID)
       .eq('orders.status', 'completed')
       .gte('orders.created_at', since.toISOString()),
+    sb.from('orders')
+      .select('status, total_amount, created_at')
+      .eq('business_id', BUSINESS_ID)
+      .gte('created_at', since.toISOString()),
+    sb.from('products')
+      .select('name, current_stock, minimum_stock, cost_price, unit, status')
+      .eq('business_id', BUSINESS_ID)
+      .eq('status', 'active'),
   ]);
   assertNoError(ordersRes.error, 'trading analytics (orders)');
   assertNoError(itemsRes.error, 'trading analytics (items)');
+  assertNoError(allOrdersRes.error, 'trading analytics (order outcomes)');
+  if (stockRes.error) console.warn('trading analytics (stock) unavailable:', stockRes.error.message);
 
   const orders = ordersRes.data || [];
 
   renderSalesPerformanceCards();
   renderPeakTrading(orders);
   renderBranchSales(orders);
+  renderOrderOutcomes(allOrdersRes.data || []);
+  renderIntelligentAnalytics(orders, stockRes.data || []);
 }
 
 function renderSalesPerformanceCards(){
@@ -3275,12 +3672,13 @@ function renderPeakTrading(orders){
     statsEl.innerHTML = '';
     if (hourChart) { hourChart.destroy(); hourChart = null; }
     if (dowChart) { dowChart.destroy(); dowChart = null; }
+    document.getElementById('sales-heatmap').innerHTML = emptyState('No trading data yet.');
     return;
   }
 
   const hourAgg = Array.from({ length: 24 }, () => ({ revenue: 0, orders: 0 }));
   const dowAgg = Array.from({ length: 7 }, () => ({ revenue: 0, orders: 0 }));
-  const slots = {}; // `${dow}-${hour}` -> { dow, hour, revenue, orders }
+  const slots = {}; // `${dow}-${hour}` -> { dow, hour, revenue, orders, dateSet }
 
   orders.forEach(o => {
     const d = new Date(o.created_at);
@@ -3290,17 +3688,34 @@ function renderPeakTrading(orders){
     hourAgg[hour].revenue += amt; hourAgg[hour].orders += 1;
     dowAgg[dow].revenue += amt; dowAgg[dow].orders += 1;
     const key = `${dow}-${hour}`;
-    if (!slots[key]) slots[key] = { dow, hour, revenue: 0, orders: 0 };
+    if (!slots[key]) slots[key] = { dow, hour, revenue: 0, orders: 0, dateSet: new Set() };
     slots[key].revenue += amt; slots[key].orders += 1;
+    slots[key].dateSet.add(d.toISOString().slice(0, 10));
   });
 
   const slotList = Object.values(slots);
-  const peakSlot = slotList.reduce((a, b) => (b.revenue > a.revenue ? b : a));
-  const quietSlot = slotList.reduce((a, b) => (b.revenue < a.revenue ? b : a));
+  // A raw max-revenue slot can be won by a single huge order on one single occurrence
+  // out of only ~4 (one per week in a 28-day window) — that's a fluke, not a "busiest
+  // window" pattern. Require the slot to have shown up on at least 2 separate calendar
+  // days before it's eligible to be crowned peak, so one outlier order can't swing the
+  // headline banner; only fall back to the unfiltered max if nothing repeats yet
+  // (e.g. a very new or very short window).
+  const repeatingSlots = slotList.filter(s => s.dateSet.size >= 2);
+  const peakCandidates = repeatingSlots.length ? repeatingSlots : slotList;
+  const peakSlot = peakCandidates.reduce((a, b) => (b.revenue > a.revenue ? b : a));
+  const peakSlotIsFluke = !repeatingSlots.length && slotList.length > 0;
+  // Report the slowest day only (no specific hour) — day totals are aggregated
+  // across the whole window so ties are rare and the result reflects a real,
+  // recurring low-activity day rather than one arbitrary empty hour slot.
+  const quietDowIdx = dowAgg.reduce((best, cur, i, arr) => (cur.revenue < arr[best].revenue ? i : best), 0);
   const peakHourIdx = hourAgg.reduce((best, cur, i, arr) => (cur.revenue > arr[best].revenue ? i : best), 0);
   const peakDowIdx = dowAgg.reduce((best, cur, i, arr) => (cur.revenue > arr[best].revenue ? i : best), 0);
 
-  insightEl.innerHTML = `<strong>${esc(DOW_NAMES[peakSlot.dow])} ${hourLabel(peakSlot.hour)}</strong> is your busiest trading window over the last ${ANALYTICS_DAYS} days — ${fmtMoney(peakSlot.revenue)} across ${peakSlot.orders} order${peakSlot.orders === 1 ? '' : 's'}.`;
+  const hmHint = document.getElementById('heatmap-days-hint');
+  if (hmHint) hmHint.textContent = ANALYTICS_DAYS;
+  renderSalesHeatmap(slots);
+
+  insightEl.innerHTML = `<strong>${esc(DOW_NAMES[peakSlot.dow])} ${hourLabel(peakSlot.hour)}</strong> is your busiest trading window over the last ${ANALYTICS_DAYS} days — ${fmtMoney(peakSlot.revenue)} across ${peakSlot.orders} order${peakSlot.orders === 1 ? '' : 's'}${peakSlotIsFluke ? ' <span class="muted" style="font-weight:400;">(based on a single occurrence — not enough repeats yet to call this a pattern)</span>' : ` on ${peakSlot.dateSet.size} separate days`}.`;
 
   const peakHour = hourAgg[peakHourIdx];
   const stats = [
@@ -3309,12 +3724,9 @@ function renderPeakTrading(orders){
     ['Orders in peak hour', peakHour.orders],
     ['Revenue in peak hour', fmtMoney(peakHour.revenue)],
     ['Avg order (peak hour)', fmtMoney(peakHour.orders ? peakHour.revenue / peakHour.orders : 0)],
-    ['Quietest window', `${DOW_NAMES[quietSlot.dow]} ${hourLabel(quietSlot.hour)}`],
+    ['Slowest day', DOW_NAMES[quietDowIdx]],
   ];
-  statsEl.innerHTML = stats.map(([label, value]) => statCard(label, value, 'var(--text)')).join('')
-    + `<div class="muted" style="grid-column:1/-1; font-size:11px; margin-top:4px;">
-        "Peak hour" and "peak day" above are each totalled across the whole ${ANALYTICS_DAYS}-day window regardless of the other dimension — the highlighted window at the top is the single best-performing day+hour combination, which is why the numbers won't always match.
-      </div>`;
+  statsEl.innerHTML = stats.map(([label, value]) => statCard(label, value, 'var(--text)')).join('');
 
   if (typeof Chart === 'undefined') return;
 
@@ -3401,6 +3813,252 @@ function renderPeakTrading(orders){
   });
 }
 
+/* =====================================================================================
+   INTELLIGENT ANALYTICS
+   A row of auto-generated, data-grounded insight cards built entirely from the same
+   28-day completed-orders window already fetched for peak trading — no extra queries.
+   Every figure here is derived, never invented: momentum compares two real halves of
+   the window, consistency is a real coefficient of variation per weekday, anomalies are
+   real z-scored days, discount impact and repeat-customer rate are real order-level
+   aggregates. Cards are skipped (not faked) when there isn't enough data to say something
+   meaningful.
+===================================================================================== */
+function renderIntelligentAnalytics(orders, stockItems){
+  const hintEl = document.getElementById('insights-days-hint');
+  if (hintEl) hintEl.textContent = ANALYTICS_DAYS;
+  const grid = document.getElementById('insight-grid');
+  if (!grid) return;
+  stockItems = stockItems || [];
+
+  if (orders.length < 6 && stockItems.length < 3) {
+    grid.innerHTML = `<div style="grid-column:1/-1;">${emptyState('Not enough completed orders yet to generate insights.')}</div>`;
+    return;
+  }
+
+  // ---- Daily revenue series across the full window (oldest -> newest) ----
+  const dayMs = 86400000;
+  const today0 = new Date(); today0.setHours(0,0,0,0);
+  const startDay = new Date(today0.getTime() - (ANALYTICS_DAYS - 1) * dayMs);
+  const dailyRevenue = Array.from({ length: ANALYTICS_DAYS }, () => 0);
+  const dailyOrders = Array.from({ length: ANALYTICS_DAYS }, () => 0);
+  orders.forEach(o => {
+    const idx = Math.floor((new Date(o.created_at).setHours(0,0,0,0) - startDay.getTime()) / dayMs);
+    if (idx >= 0 && idx < ANALYTICS_DAYS) {
+      dailyRevenue[idx] += Number(o.total_amount || 0);
+      dailyOrders[idx] += 1;
+    }
+  });
+
+  const cards = [];
+
+  // ---- 1) Momentum: last 7 days vs the previous 7 days inside the window ----
+  {
+    const last7 = dailyRevenue.slice(-7).reduce((s,v) => s+v, 0);
+    const prev7 = dailyRevenue.slice(-14, -7).reduce((s,v) => s+v, 0);
+    if (prev7 > 0) {
+      const change = ((last7 - prev7) / prev7) * 100;
+      let tag, accent;
+      if (change >= 15) { tag = 'Accelerating'; accent = 'var(--mint)'; }
+      else if (change >= 3) { tag = 'Growing'; accent = 'var(--mint)'; }
+      else if (change > -3) { tag = 'Steady'; accent = 'var(--text-dim)'; }
+      else if (change > -15) { tag = 'Slowing'; accent = 'var(--red)'; }
+      else { tag = 'Declining'; accent = 'var(--red)'; }
+      cards.push(iconCard({
+        accent, tag, label: 'Momentum',
+        headline: `${change >= 0 ? '+' : ''}${change.toFixed(1)}%`,
+        body: `Last 7 days (${fmtMoney(last7)}) vs the 7 before that (${fmtMoney(prev7)}).`,
+        icon: change >= 0
+          ? '<path d="M22 7 13.5 15.5 8.5 10.5 2 17"/><path d="M16 7h6v6"/>'
+          : '<path d="M22 17 13.5 8.5 8.5 13.5 2 7"/><path d="M16 17h6v-6"/>',
+      }));
+    }
+  }
+
+  // ---- 2) Anomaly detection: z-score each day, surface the strongest outlier ----
+  {
+    const nonZero = dailyRevenue.filter(v => v > 0);
+    if (nonZero.length >= 7) {
+      const mean = nonZero.reduce((s,v) => s+v, 0) / nonZero.length;
+      const variance = nonZero.reduce((s,v) => s + (v-mean)**2, 0) / nonZero.length;
+      const stdev = Math.sqrt(variance);
+      if (stdev > 0) {
+        let best = null;
+        dailyRevenue.forEach((v, i) => {
+          if (v <= 0) return;
+          const z = (v - mean) / stdev;
+          if (!best || Math.abs(z) > Math.abs(best.z)) best = { z, i, v };
+        });
+        if (best && Math.abs(best.z) >= 1.5) {
+          const d = new Date(startDay.getTime() + best.i * dayMs);
+          const isSpike = best.z > 0;
+          cards.push(iconCard({
+            accent: isSpike ? 'var(--mint)' : 'var(--red)',
+            tag: isSpike ? 'Spike detected' : 'Dip detected',
+            label: 'Anomaly',
+            headline: d.toLocaleDateString('en-ZA', { weekday:'short', day:'2-digit', month:'short' }),
+            body: `${fmtMoney(best.v)} — ${Math.abs((best.v/mean-1)*100).toFixed(0)}% ${isSpike ? 'above' : 'below'} this window's daily average (${fmtMoney(mean)}).`,
+            icon: '<circle cx="12" cy="12" r="9"/><path d="M12 8v5"/><path d="M12 16h.01"/>',
+          }));
+        }
+      }
+    }
+  }
+
+  // ---- 3) Weekday consistency: coefficient of variation per weekday ----
+  {
+    const byDow = Array.from({ length: 7 }, () => []);
+    dailyRevenue.forEach((v, i) => {
+      const d = new Date(startDay.getTime() + i * dayMs);
+      byDow[d.getDay()].push(v);
+    });
+    const stats = byDow.map((vals, dow) => {
+      const mean = vals.reduce((s,v) => s+v, 0) / (vals.length || 1);
+      if (mean <= 0) return null;
+      const variance = vals.reduce((s,v) => s + (v-mean)**2, 0) / vals.length;
+      return { dow, mean, cv: Math.sqrt(variance) / mean };
+    }).filter(Boolean);
+    if (stats.length >= 4) {
+      const mostConsistent = stats.reduce((a,b) => b.cv < a.cv ? b : a);
+      const mostVolatile = stats.reduce((a,b) => b.cv > a.cv ? b : a);
+      cards.push(iconCard({
+        accent: 'var(--text)', tag: 'Reliability', label: 'Most consistent day',
+        headline: DOW_NAMES[mostConsistent.dow],
+        body: `Averages ${fmtMoney(mostConsistent.mean)} with the least week-to-week swing. ${DOW_NAMES[mostVolatile.dow]} swings the most — plan staffing and stock with that in mind.`,
+        icon: '<path d="M3 12h4l3 8 4-16 3 8h4"/>',
+      }));
+    }
+  }
+
+  // ---- 4) Discount impact ----
+  {
+    const withDiscount = orders.filter(o => Number(o.discount_amount || 0) > 0);
+    const withoutDiscount = orders.filter(o => Number(o.discount_amount || 0) === 0);
+    const totalSubtotal = orders.reduce((s,o) => s + Number(o.subtotal || 0), 0);
+    const totalDiscount = orders.reduce((s,o) => s + Number(o.discount_amount || 0), 0);
+    if (withDiscount.length >= 3 && withoutDiscount.length >= 3 && totalSubtotal > 0) {
+      const avgWith = withDiscount.reduce((s,o) => s + Number(o.total_amount||0), 0) / withDiscount.length;
+      const avgWithout = withoutDiscount.reduce((s,o) => s + Number(o.total_amount||0), 0) / withoutDiscount.length;
+      const liftPct = avgWithout > 0 ? ((avgWith - avgWithout) / avgWithout) * 100 : 0;
+      const discountRate = (totalDiscount / totalSubtotal) * 100;
+      cards.push(iconCard({
+        accent: liftPct >= 0 ? 'var(--mint)' : 'var(--red)', tag: `${discountRate.toFixed(1)}% avg discount rate`, label: 'Discount impact',
+        headline: `${liftPct >= 0 ? '+' : ''}${liftPct.toFixed(0)}%`,
+        body: `Discounted orders average ${fmtMoney(avgWith)} vs ${fmtMoney(avgWithout)} on full-price orders — ${withDiscount.length} of ${orders.length} orders carried a discount.`,
+        icon: '<circle cx="8" cy="8" r="2.5"/><circle cx="16" cy="16" r="2.5"/><path d="M18 6 6 18"/>',
+      }));
+    }
+  }
+
+  // ---- 5) Repeat customer rate ----
+  {
+    const withCustomer = orders.filter(o => o.customer_id);
+    if (withCustomer.length >= 6) {
+      const counts = {};
+      withCustomer.forEach(o => { counts[o.customer_id] = (counts[o.customer_id] || 0) + 1; });
+      const custIds = Object.keys(counts);
+      const repeatCustomers = custIds.filter(id => counts[id] > 1).length;
+      const repeatOrders = withCustomer.filter(o => counts[o.customer_id] > 1).length;
+      const repeatRatePct = (repeatCustomers / custIds.length) * 100;
+      const revenueSharePct = (repeatOrders / withCustomer.length) * 100;
+      cards.push(iconCard({
+        accent: 'var(--text)', tag: `${custIds.length} identified customers`, label: 'Repeat customer rate',
+        headline: `${repeatRatePct.toFixed(0)}%`,
+        body: `${repeatCustomers} of ${custIds.length} identified customers ordered more than once, accounting for ${revenueSharePct.toFixed(0)}% of identified orders.`,
+        icon: '<circle cx="8.5" cy="8" r="3.5"/><path d="M2.5 19c1.2-3.2 3.3-4.8 6-4.8s4.8 1.6 6 4.8"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.2 13.5c1.7.2 3 1.4 3.8 3.6"/>',
+      }));
+    }
+  }
+
+  // ---- 6) Basket size trend: items/order, first half of window vs second half ----
+  {
+    const mid = Math.floor(ANALYTICS_DAYS / 2);
+    const ordersByHalf = [orders.filter(o => new Date(o.created_at) < new Date(startDay.getTime() + mid*dayMs)),
+                           orders.filter(o => new Date(o.created_at) >= new Date(startDay.getTime() + mid*dayMs))];
+    const avgOrderValue = ordersByHalf.map(list => list.length ? list.reduce((s,o)=>s+Number(o.total_amount||0),0)/list.length : 0);
+    if (avgOrderValue[0] > 0 && avgOrderValue[1] > 0) {
+      const changePct = ((avgOrderValue[1] - avgOrderValue[0]) / avgOrderValue[0]) * 100;
+      if (Math.abs(changePct) >= 4) {
+        cards.push(iconCard({
+          accent: changePct >= 0 ? 'var(--mint)' : 'var(--red)', tag: 'Basket size trend', label: 'Average order value',
+          headline: `${changePct >= 0 ? '+' : ''}${changePct.toFixed(1)}%`,
+          body: `Trending from ${fmtMoney(avgOrderValue[0])} to ${fmtMoney(avgOrderValue[1])} across the window — ${changePct >= 0 ? 'customers are spending more per visit' : 'baskets are getting smaller, consider a bundle or upsell push'}.`,
+          icon: '<path d="M4 4h2l1.5 11.5A2 2 0 0 0 9.5 17h7a2 2 0 0 0 2-1.6L20 8H7"/><circle cx="9.5" cy="20.5" r="1.2"/><circle cx="16.5" cy="20.5" r="1.2"/>',
+        }));
+      }
+    }
+  }
+
+  // ---- 7) Top performer: revenue by staff member who rang up the sale ----
+  {
+    const withStaff = orders.filter(o => o.profiles?.full_name);
+    if (withStaff.length >= 6) {
+      const byStaff = {};
+      withStaff.forEach(o => {
+        const name = o.profiles.full_name;
+        const s = byStaff[name] || { revenue: 0, orders: 0 };
+        s.revenue += Number(o.total_amount || 0);
+        s.orders += 1;
+        byStaff[name] = s;
+      });
+      const staffList = Object.entries(byStaff).map(([name, v]) => ({ name, ...v }));
+      if (staffList.length >= 2) {
+        const top = staffList.reduce((a,b) => b.revenue > a.revenue ? b : a);
+        const avgRevenue = staffList.reduce((s,x) => s + x.revenue, 0) / staffList.length;
+        const leadPct = avgRevenue > 0 ? ((top.revenue - avgRevenue) / avgRevenue) * 100 : 0;
+        cards.push(iconCard({
+          accent: 'var(--text)', tag: `${staffList.length} staff selling`, label: 'Top performer',
+          headline: top.name,
+          body: `${fmtMoney(top.revenue)} across ${top.orders} order${top.orders===1?'':'s'} in the last ${ANALYTICS_DAYS} days${leadPct >= 1 ? ` — ${leadPct.toFixed(0)}% above the team average` : ' — in line with the team average'}.`,
+          icon: '<path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0V4Z"/><path d="M7 6H4a1 1 0 0 0-1 1c0 2.5 1.7 4.4 4 4.9"/><path d="M17 6h3a1 1 0 0 1 1 1c0 2.5-1.7 4.4-4 4.9"/>',
+        }));
+      }
+    }
+  }
+
+  // ---- 8) Stock risk: active products at or below their minimum stock threshold ----
+  {
+    const active = stockItems;
+    if (active.length >= 3) {
+      const low = active.filter(p => Number(p.current_stock) <= Number(p.minimum_stock));
+      if (low.length > 0) {
+        const restockUnits = low.reduce((s,p) => s + Math.max(0, Number(p.minimum_stock) - Number(p.current_stock)), 0);
+        const restockValue = low.reduce((s,p) => s + Math.max(0, Number(p.minimum_stock) - Number(p.current_stock)) * Number(p.cost_price || 0), 0);
+        const ratio = (p) => Number(p.minimum_stock) > 0 ? Number(p.current_stock) / Number(p.minimum_stock) : 0;
+        const worst = low.reduce((a,b) => ratio(b) < ratio(a) ? b : a);
+        cards.push(iconCard({
+          accent: 'var(--red)', tag: `${low.length} of ${active.length} products`, label: 'Stock risk',
+          headline: `${low.length} below threshold`,
+          body: `${esc(worst.name)} is furthest below its minimum (${worst.current_stock}/${worst.minimum_stock} ${esc(worst.unit || 'units')}). Restocking everything below threshold needs about ${restockUnits} unit${restockUnits===1?'':'s'}${restockValue > 0 ? ` (~${fmtMoney(restockValue)} at cost)` : ''}.`,
+          icon: '<path d="M12 2 2 21h20L12 2Z"/><path d="M12 9v5"/><path d="M12 17h.01"/>',
+        }));
+      } else {
+        cards.push(iconCard({
+          accent: 'var(--mint)', tag: `${active.length} active products`, label: 'Stock risk',
+          headline: 'All healthy',
+          body: `No active products are at or below their minimum stock threshold right now.`,
+          icon: '<path d="M20 6 9 17l-5-5"/>',
+        }));
+      }
+    }
+  }
+
+  grid.innerHTML = cards.length
+    ? cards.join('')
+    : emptyState('Nothing statistically notable yet — check back as more orders come in.');
+}
+
+function iconCard({ accent, tag, label, headline, body, icon }){
+  return `<div class="insight-card" style="--insight-accent:${accent};">
+    <div class="ic-tag">${esc(tag)}</div>
+    <div class="ic-head">
+      <div class="ic-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${icon}</svg></div>
+      <div class="ic-label">${esc(label)}</div>
+    </div>
+    <div class="ic-headline">${esc(headline)}</div>
+    <div class="ic-body">${body}</div>
+  </div>`;
+}
+
 function renderBranchSales(orders){
   const panel = document.getElementById('branch-panel');
   const el = document.getElementById('branch-sales-list');
@@ -3428,6 +4086,371 @@ function renderBranchSales(orders){
         <div style="height:100%; width:${max ? (r.revenue/max*100) : 0}%; background:var(--mint);"></div>
       </div>
     </div>`).join('');
+}
+
+/* -------- Trading heatmap: hour (0–23) × day-of-week grid, shaded by revenue -------- */
+function renderSalesHeatmap(slots){
+  const wrap = document.getElementById('sales-heatmap');
+  if (!wrap) return;
+  const values = Object.values(slots);
+  const maxRevenue = Math.max(1, ...values.map(s => s.revenue));
+  const dowShort = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+  const displayOrder = [1,2,3,4,5,6,0]; // Monday → Sunday
+
+  let html = '<div class="heatmap-grid">';
+  html += '<div></div>' + Array.from({ length:24 }, (_, h) =>
+    `<div class="heatmap-hour-label">${h % 3 === 0 ? String(h).padStart(2,'0') : ''}</div>`).join('') + '<div></div>';
+
+  displayOrder.forEach(dow => {
+    html += `<div class="heatmap-row">`;
+    html += `<div class="heatmap-row-label">${dowShort[dow]}</div>`;
+    let rowRevenue = 0, rowOrders = 0;
+    for (let h = 0; h < 24; h++) {
+      const slot = slots[`${dow}-${h}`];
+      const revenue = slot ? slot.revenue : 0;
+      const orders = slot ? slot.orders : 0;
+      rowRevenue += revenue; rowOrders += orders;
+      const intensity = revenue / maxRevenue; // 0 → 1
+      // Greyscale ramp: near-white for quiet slots, near-black for the busiest —
+      // no colour hue, just how dark the cell reads.
+      const lightness = 94 - Math.round(intensity * 82); // 94% (quiet) → 12% (peak)
+      const bg = revenue > 0 ? `hsl(0,0%,${lightness}%)` : 'rgba(10,10,10,.04)';
+      const tip = `${dowShort[dow]} ${String(h).padStart(2,'0')}:00 · ${fmtMoney(revenue)} · ${orders} order${orders === 1 ? '' : 's'}`;
+      const edgeCls = h < 3 ? ' edge-left' : (h > 20 ? ' edge-right' : '');
+      html += `<div class="heatmap-cell${edgeCls}" style="background:${bg};" data-tip="${esc(tip)}"></div>`;
+    }
+    html += `<div class="heatmap-total-label" title="${esc(fmtMoney(rowRevenue))}">${fmtMoneyCompact(rowRevenue)}</div>`;
+    html += `</div>`;
+  });
+  html += '</div>';
+
+  html += `<div class="heatmap-legend">Quiet
+    <span class="hl-scale">
+      ${[94,76,58,40,22,12].map(l => `<span class="hl-swatch" style="background:hsl(0,0%,${l}%);"></span>`).join('')}
+    </span>
+    Busy</div>`;
+
+  wrap.innerHTML = html;
+}
+
+/* -------- Order outcomes: what actually happens to orders — completed, cancelled,
+   refunded, pending — as a greyscale donut + legend, with a plain-language cancellation/
+   refund-rate callout. Replaces the old payment-method donut with something that flags
+   operational problems (a rising cancellation rate, orders stuck pending) instead of
+   just restating what tender customers used, which the checkout screen already shows. */
+function renderOrderOutcomes(allOrders){
+  const legendEl = document.getElementById('outcomes-legend');
+  const centerValEl = document.getElementById('oc-value');
+  const insightEl = document.getElementById('outcomes-insight');
+  const ctx = document.getElementById('outcomes-chart');
+  if (!legendEl || !ctx) return;
+
+  if (!allOrders.length) {
+    legendEl.innerHTML = emptyState('No orders yet.');
+    if (centerValEl) centerValEl.textContent = '—';
+    if (insightEl) insightEl.textContent = '—';
+    if (outcomesChart) { outcomesChart.destroy(); outcomesChart = null; }
+    return;
+  }
+
+  const byStatus = {};
+  allOrders.forEach(o => {
+    const key = o.status || 'unknown';
+    if (!byStatus[key]) byStatus[key] = { revenue: 0, count: 0 };
+    byStatus[key].revenue += Number(o.total_amount || 0);
+    byStatus[key].count += 1;
+  });
+  const statusOrder = ['completed', 'pending', 'cancelled', 'refunded'];
+  const rows = Object.entries(byStatus).sort((a, b) => {
+    const ai = statusOrder.indexOf(a[0]), bi = statusOrder.indexOf(b[0]);
+    if (ai !== -1 || bi !== -1) return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
+    return b[1].count - a[1].count;
+  });
+
+  const totalOrders = rows.reduce((s, [, v]) => s + v.count, 0);
+  if (centerValEl) centerValEl.textContent = totalOrders;
+
+  const completed = byStatus.completed?.count || 0;
+  const cancelled = byStatus.cancelled?.count || 0;
+  const refunded = byStatus.refunded?.count || 0;
+  const cancelRate = (cancelled / totalOrders) * 100;
+  const refundRate = (refunded / totalOrders) * 100;
+  if (insightEl) {
+    if (cancelled === 0 && refunded === 0) {
+      insightEl.innerHTML = `<strong>${((completed/totalOrders)*100).toFixed(0)}%</strong> of orders completed cleanly — no cancellations or refunds in this window.`;
+    } else {
+      insightEl.innerHTML = `<strong>${cancelRate.toFixed(1)}%</strong> cancelled · <strong>${refundRate.toFixed(1)}%</strong> refunded out of ${totalOrders} orders this window.`;
+    }
+  }
+
+  // Greyscale palette in a fixed status → shade mapping so "cancelled" and "refunded"
+  // always read as the lighter, more alarming shades regardless of sort order.
+  const shadeByStatus = { completed:'#1a1a1a', pending:'#808080', cancelled:'#f2555a', refunded:'#c9c9c9' };
+  const palette = ['#1a1a1a', '#4d4d4d', '#808080', '#aaaaaa', '#cccccc', '#e5e5e5'];
+  const colors = rows.map(([status], i) => shadeByStatus[status] || palette[i % palette.length]);
+
+  legendEl.innerHTML = rows.map(([status, v], i) => `
+    <div class="pl-row">
+      <span class="pl-swatch" style="background:${colors[i]};"></span>
+      <span class="pl-name">${esc(status)}</span>
+      <span class="pl-pct">${fmtMoney(v.revenue)} · ${(v.count / totalOrders * 100).toFixed(0)}%</span>
+    </div>`).join('');
+
+  if (typeof Chart === 'undefined') return;
+  if (outcomesChart) outcomesChart.destroy();
+  outcomesChart = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: rows.map(([status]) => status),
+      datasets: [{
+        data: rows.map(([, v]) => v.count),
+        backgroundColor: colors,
+        borderColor: '#ffffff',
+        borderWidth: 2,
+        hoverOffset: 6,
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '72%',
+      plugins: {
+        legend: { display:false },
+        tooltip: {
+          backgroundColor:'#111111', borderWidth:0, titleColor:'#fff', bodyColor:'#fff', padding:10, cornerRadius:8,
+          callbacks: { label: (c) => `${c.label}: ${c.parsed} order${c.parsed === 1 ? '' : 's'}` }
+        }
+      }
+    }
+  });
+}
+
+/* =====================================================================================
+   GROWTH TARGET — now user-settable
+   Defaults to the original +10%-vs-last-month goal, but the "Set goal" button lets
+   whoever's running this business pick either a custom growth percentage or a fixed
+   monthly revenue target instead. The choice is saved per business on this device
+   (falls back to an in-memory value for the session if storage isn't available, e.g.
+   inside a sandboxed preview) so it persists across reloads on the real deployment.
+===================================================================================== */
+const GT_MEMORY_FALLBACK = {};
+function growthTargetKey(){ return `giotrade_growth_target_${BUSINESS_ID || 'default'}`; }
+function getGrowthTargetSetting(){
+  const key = growthTargetKey();
+  try {
+    const raw = window.localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+  } catch (err) { /* storage unavailable — fall through to in-memory */ }
+  return GT_MEMORY_FALLBACK[key] || null;
+}
+function setGrowthTargetSetting(setting){
+  const key = growthTargetKey();
+  GT_MEMORY_FALLBACK[key] = setting;
+  try {
+    if (setting) window.localStorage.setItem(key, JSON.stringify(setting));
+    else window.localStorage.removeItem(key);
+  } catch (err) { /* storage unavailable — in-memory value above still applies this session */ }
+}
+
+/* -------- Growth target: real calendar month-to-date net sales vs the active goal --------
+   Rewritten from a rolling-30-day comparison (which drifted out of sync with "this month"
+   and, when there was no prior window to compare against, silently derived its own target
+   from the current figure — pinning the ring at a fixed percentage no matter how sales
+   actually moved). This version anchors to the real calendar month, compares against the
+   real prior calendar month, and adds pace: whether today's progress is ahead of, on, or
+   behind where it needs to be given how far through the month we are, plus a run-rate
+   projection for where the month is headed if nothing changes. */
+let GT_LAST_MONTH_TOTAL = 0; // cached for the editor's live preview, no extra query needed
+async function loadGrowthTarget(){
+  const pctEl = document.getElementById('gt-pct');
+  const ringEl = document.getElementById('gt-ring-progress');
+  const statsEl = document.getElementById('gt-stats');
+  const hintEl = document.getElementById('gt-hint');
+  if (!pctEl || !ringEl || !statsEl) return;
+
+  try {
+    const now = new Date();
+    const startThisMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+    const startLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+    const dayOfMonth = now.getDate();
+
+    const { data, error } = await sb
+      .from('orders')
+      .select('subtotal, discount_amount, created_at')
+      .eq('business_id', BUSINESS_ID).eq('status', 'completed')
+      .gte('created_at', startLastMonth.toISOString())
+      .lt('created_at', now.toISOString());
+    assertNoError(error, 'growth target');
+
+    let current = 0, lastMonthTotal = 0;
+    (data || []).forEach(o => {
+      const net = Number(o.subtotal || 0) - Number(o.discount_amount || 0);
+      if (new Date(o.created_at) >= startThisMonth) current += net; else lastMonthTotal += net;
+    });
+    GT_LAST_MONTH_TOTAL = lastMonthTotal;
+
+    const custom = getGrowthTargetSetting();
+    let target = null, goalLabel = '';
+    if (custom && custom.mode === 'fixed' && custom.value > 0) {
+      target = custom.value;
+      goalLabel = 'fixed target';
+    } else {
+      const growthPct = (custom && custom.mode === 'pct' && custom.value >= 0) ? custom.value : 10;
+      if (lastMonthTotal > 0) {
+        target = lastMonthTotal * (1 + growthPct / 100);
+        goalLabel = `+${growthPct}% vs last month`;
+      }
+      // else: no sales last month to grow from — leave target null rather than
+      // fabricating one from this month's own total (that self-referential target
+      // used to lock the ring at a fixed % no matter what actually sold).
+    }
+
+    if (hintEl) hintEl.textContent = target ? 'month-to-date vs goal' : 'month-to-date';
+
+    if (target === null) {
+      pctEl.textContent = '—';
+      ringEl.style.strokeDashoffset = '326.7';
+      statsEl.innerHTML = `
+        <div class="gt-stat-row"><span class="gt-stat-label">This month so far</span><span class="gt-stat-value">${fmtMoney(current)}</span></div>
+        <div class="gt-stat-row"><span class="gt-stat-label">Last month</span><span class="gt-stat-value">${fmtMoney(lastMonthTotal)}</span></div>
+        <div class="gt-empty-note">No sales recorded last month, so a % growth goal can't be calculated yet. Set a fixed monthly target instead.</div>
+      `;
+      return;
+    }
+
+    const pct = target > 0 ? Math.min(999, (current / target) * 100) : 0;
+    const circumference = 326.7; // 2 * π * 52
+    const filled = Math.min(1, pct / 100);
+
+    const expectedPct = Math.min(100, (dayOfMonth / daysInMonth) * 100);
+    const paceDelta = pct - expectedPct;
+    let paceLabel, paceColor;
+    if (pct >= 100) { paceLabel = 'Goal reached'; paceColor = 'var(--mint)'; }
+    else if (paceDelta >= 5) { paceLabel = 'Ahead of pace'; paceColor = 'var(--mint)'; }
+    else if (paceDelta <= -8) { paceLabel = 'Behind pace'; paceColor = 'var(--red)'; }
+    else { paceLabel = 'On pace'; paceColor = 'var(--text-muted)'; }
+
+    ringEl.style.strokeDashoffset = String(circumference * (1 - filled));
+    ringEl.style.stroke = pct >= 100 ? '#1a1a1a' : (paceColor === 'var(--red)' ? 'var(--red)' : '#4d4d4d');
+    pctEl.textContent = `${pct.toFixed(0)}%`;
+
+    const remaining = Math.max(0, target - current);
+    const projected = dayOfMonth > 0 ? (current / dayOfMonth) * daysInMonth : current;
+    const daysLeft = Math.max(0, daysInMonth - dayOfMonth);
+
+    statsEl.innerHTML = `
+      <div class="gt-stat-row"><span class="gt-stat-label">This month so far</span><span class="gt-stat-value">${fmtMoney(current)}</span></div>
+      <div class="gt-stat-row"><span class="gt-stat-label">Goal (${esc(goalLabel)})</span><span class="gt-stat-value">${fmtMoney(target)}</span></div>
+      <div class="gt-stat-row"><span class="gt-stat-label">Pace · day ${dayOfMonth} of ${daysInMonth}</span><span class="gt-stat-value" style="color:${paceColor};">${esc(paceLabel)}</span></div>
+      <div class="gt-stat-row"><span class="gt-stat-label">Projected month-end</span><span class="gt-stat-value">${fmtMoney(projected)}</span></div>
+      <div class="gt-stat-row"><span class="gt-stat-label">${remaining > 0 ? `Still needed · ${daysLeft}d left` : 'Goal reached — surplus'}</span><span class="gt-stat-value">${fmtMoney(remaining > 0 ? remaining : current - target)}</span></div>
+    `;
+  } catch (err) {
+    pctEl.textContent = '—';
+    statsEl.innerHTML = `<div class="gt-stat-row"><span class="gt-stat-label">Failed to load</span></div>`;
+    console.warn('growth target failed to load:', err.message || err);
+  }
+}
+
+function wireGrowthTargetEditor(){
+  const toggleBtn = document.getElementById('gt-edit-toggle');
+  const editor = document.getElementById('gt-editor');
+  const modeSelect = document.getElementById('gt-mode-select');
+  const valueInput = document.getElementById('gt-value-input');
+  const valueLabel = document.getElementById('gt-value-label');
+  const saveBtn = document.getElementById('gt-save-btn');
+  const resetBtn = document.getElementById('gt-reset-btn');
+  const previewEl = document.getElementById('gt-editor-preview');
+  const presetRow = document.getElementById('gt-preset-row');
+  if (!toggleBtn || !editor) return;
+
+  function syncFieldsToMode(){
+    if (modeSelect.value === 'fixed') {
+      valueLabel.textContent = `Target (${CURRENCY})`;
+      valueInput.placeholder = '50000';
+      valueInput.step = '100';
+    } else {
+      valueLabel.textContent = 'Growth %';
+      valueInput.placeholder = '10';
+      valueInput.step = '1';
+    }
+    updatePreview();
+  }
+
+  // Grounds the goal editor in a real number instead of an abstract percentage —
+  // shows exactly what target the chosen growth % (or fixed value) works out to,
+  // using last month's actual total already fetched by loadGrowthTarget.
+  function updatePreview(){
+    if (!previewEl) return;
+    const mode = modeSelect.value;
+    const value = Number(valueInput.value);
+    if (!isFinite(value) || value < 0) { previewEl.textContent = ''; return; }
+    if (mode === 'fixed') {
+      previewEl.textContent = value > 0 ? `Target: ${fmtMoney(value)} this calendar month.` : 'Enter a target amount above zero.';
+    } else if (GT_LAST_MONTH_TOTAL > 0) {
+      const t = GT_LAST_MONTH_TOTAL * (1 + value / 100);
+      previewEl.textContent = `Last month: ${fmtMoney(GT_LAST_MONTH_TOTAL)} → target: ${fmtMoney(t)}.`;
+    } else {
+      previewEl.textContent = `No sales recorded last month yet — a fixed target will work better than a % goal.`;
+    }
+  }
+
+  function markActivePreset(){
+    if (!presetRow) return;
+    const mode = modeSelect.value, value = String(Number(valueInput.value));
+    presetRow.querySelectorAll('.gt-preset-chip').forEach(chip => {
+      chip.classList.toggle('active', chip.dataset.mode === 'pct' && mode === 'pct' && chip.dataset.value === value);
+    });
+  }
+
+  function openEditor(){
+    const custom = getGrowthTargetSetting();
+    modeSelect.value = custom?.mode || 'pct';
+    valueInput.value = custom ? custom.value : 10;
+    syncFieldsToMode();
+    markActivePreset();
+    editor.classList.add('open');
+  }
+
+  toggleBtn.addEventListener('click', () => {
+    editor.classList.contains('open') ? editor.classList.remove('open') : openEditor();
+  });
+  modeSelect.addEventListener('change', () => { syncFieldsToMode(); markActivePreset(); });
+  valueInput.addEventListener('input', () => { updatePreview(); markActivePreset(); });
+
+  if (presetRow) {
+    presetRow.addEventListener('click', (e) => {
+      const chip = e.target.closest('.gt-preset-chip');
+      if (!chip) return;
+      if (chip.dataset.mode === 'fixed') {
+        modeSelect.value = 'fixed';
+        valueInput.value = '';
+        valueInput.focus();
+      } else {
+        modeSelect.value = 'pct';
+        valueInput.value = chip.dataset.value;
+      }
+      syncFieldsToMode();
+      markActivePreset();
+    });
+  }
+
+  saveBtn.addEventListener('click', () => {
+    const mode = modeSelect.value;
+    const value = Number(valueInput.value);
+    if (!isFinite(value) || value < 0) { showPosToast('Enter a valid goal value.', true); return; }
+    if (mode === 'fixed' && value <= 0) { showPosToast('Enter a fixed target above zero.', true); return; }
+    setGrowthTargetSetting({ mode, value });
+    editor.classList.remove('open');
+    loadGrowthTarget();
+    showPosToast('Growth goal updated.');
+  });
+
+  resetBtn.addEventListener('click', () => {
+    setGrowthTargetSetting(null);
+    editor.classList.remove('open');
+    loadGrowthTarget();
+    showPosToast('Growth goal reset to default (+10%).');
+  });
 }
 
 async function loadOrders(){
