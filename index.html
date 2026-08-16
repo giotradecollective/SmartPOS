@@ -15,6 +15,19 @@
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script>
+  // Lets the app shell (this page + its fonts/CDN scripts) load without a live
+  // connection. Requires HTTPS (or localhost) — silently no-ops anywhere that
+  // isn't, e.g. if this file is ever opened directly instead of via the deployed
+  // domain. See sw.js for exactly what is/isn't cached.
+  if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Service worker registration failed (offline app-shell caching will be unavailable):', err);
+      });
+    });
+  }
+</script>
 <style>
   :root{
     --bg:#111111; --surface:#1a1a1a; --surface-2:#202020; --raised:#262626;
@@ -509,7 +522,7 @@
   #main{ padding:26px 32px 60px; overflow-y:auto; height:100vh; position:relative;
     --font-display:'Urbanist', sans-serif; --font-body:'Urbanist', sans-serif; --font-mono:'Urbanist', sans-serif;
     --bg:#ffffff; --surface:#ffffff; --surface-2:rgba(10,10,10,.035); --raised:#F8F8F5;
-    --border:rgba(10,10,10,.09); --border-soft:rgba(10,10,10,.06);
+    --border:rgba(10,10,10,.055); --border-soft:rgba(10,10,10,.04);
     --text:#0a0a0a; --text-muted:rgba(10,10,10,.56); --text-dim:rgba(10,10,10,.4);
     --amber:#262626; --amber-dim:#8a8a8a;
     --amber-soft:rgba(0,0,0,.06); --amber-glow:rgba(0,0,0,.15);
@@ -521,8 +534,8 @@
   }
   #main::before{
     content:''; position:fixed; top:0; left:230px; right:0; height:100vh; z-index:0; pointer-events:none;
-    background-image:radial-gradient(rgba(10,10,10,.06) .8px, transparent 1px);
-    background-size:26px 26px; opacity:.5;
+    background-image:radial-gradient(rgba(10,10,10,.035) .8px, transparent 1px);
+    background-size:30px 30px; opacity:.4;
     -webkit-mask-image:linear-gradient(to bottom, black, black 55%, transparent 96%);
             mask-image:linear-gradient(to bottom, black, black 55%, transparent 96%);
   }
@@ -535,24 +548,12 @@
     background:none; -webkit-background-clip:initial; background-clip:initial;
     color:#0a0a0a; -webkit-text-fill-color:#0a0a0a; font-weight:800; letter-spacing:-.03em;
   }
-  #main .kpi-cell, #main .panel, #main .stat-card, #main .hero-panel,
-  #main .mini-card, #main .insight-card{ border-radius:0; }
-  #main .pos-product, #main .pos-cart, #main .login-card, #main .pos-search,
-  #main .pos-search-barcode{ border-radius:0; }
-  #main .kpi-cell::before, #main .panel::before, #main .stat-card::before,
-  #main .hero-panel::before, #main .mini-card::before{
-    background:linear-gradient(90deg, transparent, var(--accent-chip), transparent);
-    border-radius:0;
-  }
   #main .mini-spark span{ background:var(--accent-chip); opacity:.9; }
   #main .kpi-cell .value, #main .stat-card .value{ font-weight:800; letter-spacing:-.02em; }
   #main .kpi-cell .label, #main .stat-card .label, #main .page-tag{ letter-spacing:.12em; }
   #main .today-chip{ border-radius:999px; }
   #main .sub.up, #main .badge.completed{ color:#333333; }
   #main .sub.up svg{ color:#333333; }
-  #main .kpi-cell::after{
-    background:radial-gradient(circle, rgba(0,0,0,.08), transparent 70%);
-  }
   #main .btn-add-product, #main .pos-pay-btn, #main .pos-cat.active, #main .pos-page-btn.active{
     background:var(--accent-chip); border-color:var(--accent-chip); color:#ffffff; font-weight:700;
   }
@@ -574,10 +575,7 @@
     border-width:1px;
   }
   #main .kpi-cell, #main .panel, #main .stat-card, #main .pos-product, #main .pos-cart{
-    box-shadow:
-      0 1px 1px rgba(0,0,0,.03),
-      0 10px 22px -16px rgba(0,0,0,.12),
-      inset 0 1px 0 rgba(255,255,255,.7);
+    box-shadow: 0 1px 2px rgba(0,0,0,.025);
   }
   #main thead th{ border-bottom-width:1px; border-color:rgba(0,0,0,.09); }
   #main tbody td{ border-bottom-width:1px; }
@@ -586,7 +584,7 @@
   #main .pos-cat:hover, #main .pos-cat-more:hover,
   #main .pos-page-btn:hover, #main .pos-action-btn:hover,
   #main .pos-product:hover, #main .pos-pay-secondary:hover{
-    border-color:rgba(0,0,0,.22);
+    border-color:rgba(0,0,0,.12);
   }
   #main .pos-toast{ color:#ffffff; }
   #main .pos-toast.err{ color:#ffffff; }
@@ -623,34 +621,22 @@
   .kpi-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
   @media (max-width:900px){ .kpi-row{ grid-template-columns:repeat(2,1fr); } }
   .kpi-cell{
-    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:21px 23px;
-    overflow:hidden; transition:border-color .25s, transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:24px 26px;
+    overflow:hidden; transition:border-color .2s, transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s;
     animation:cellIn .5s cubic-bezier(.2,.8,.2,1) both;
   }
   .kpi-row .kpi-cell:nth-child(1){ animation-delay:.02s; }
   .kpi-row .kpi-cell:nth-child(2){ animation-delay:.08s; }
   .kpi-row .kpi-cell:nth-child(3){ animation-delay:.14s; }
   .kpi-row .kpi-cell:nth-child(4){ animation-delay:.2s; }
-  .kpi-cell::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2.5px; border-radius:18px 18px 0 0;
-    background:linear-gradient(90deg, transparent, var(--amber), transparent);
-    transform:scaleX(0); transform-origin:center; transition:transform .35s cubic-bezier(.2,.8,.2,1);
-  }
-  .kpi-cell::after{
-    content:''; position:absolute; top:-40%; right:-25%; width:65%; height:140%; pointer-events:none;
-    background:radial-gradient(circle, rgba(140,140,140,.10), transparent 70%);
-    opacity:0; transition:opacity .3s ease;
-  }
   .kpi-cell:hover{
-    transform:translateY(-3px); border-color:rgba(0,0,0,.2);
-    box-shadow:0 22px 40px -20px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.8);
+    transform:translateY(-1px); border-color:rgba(0,0,0,.12);
+    box-shadow:0 10px 24px -18px rgba(0,0,0,.16);
   }
   /* Let the period dropdown menu escape the card's rounded-corner clipping while it's
      open, otherwise options past the card's bottom edge (e.g. "Daily") get cut off. */
   .kpi-cell:has(.period-dd.open){ overflow:visible; }
-  .kpi-cell:hover::before{ transform:scaleX(1); }
-  .kpi-cell:hover::after{ opacity:1; }
-  .kpi-cell .label{ font-size:10.5px; color:var(--text-muted); font-weight:700; margin-bottom:11px; text-transform:uppercase; letter-spacing:.1em;}
+  .kpi-cell .label{ font-size:10.5px; color:var(--text-muted); font-weight:600; margin-bottom:12px; text-transform:uppercase; letter-spacing:.1em;}
   .kpi-cell .value{ font-family:var(--font-display); font-size:26px; font-weight:700; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; transition:font-size .12s ease; }
   .kpi-cell .sub{ font-size:11.5px; margin-top:9px; display:flex; align-items:center; gap:4px; color:var(--text-dim); }
   .kpi-cell .sub.up{ color:var(--mint); }
@@ -665,16 +651,10 @@
 
   /* ---------------- Hero (toggleable headline figure + combo chart) ---------------- */
   .hero-panel{
-    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:22px;
-    padding:20px 24px 16px; overflow:hidden; margin-bottom:16px;
+    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:20px;
+    padding:28px 32px 20px; overflow:hidden; margin-bottom:16px;
     animation:cellIn .5s cubic-bezier(.2,.8,.2,1) both;
   }
-  .hero-panel::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2.5px; border-radius:22px 22px 0 0;
-    background:linear-gradient(90deg, transparent, var(--amber), transparent);
-    transform:scaleX(0); transform-origin:center; transition:transform .35s cubic-bezier(.2,.8,.2,1);
-  }
-  .hero-panel:hover::before{ transform:scaleX(1); }
   .hero-top{ display:flex; align-items:flex-start; justify-content:space-between; gap:16px; flex-wrap:wrap; }
   .hero-toggle{ display:flex; align-items:center; gap:18px; flex-wrap:wrap; margin-top:2px; }
   .hero-toggle-opt{ display:flex; align-items:center; gap:7px; font-size:12px; font-weight:600; color:var(--text-dim); transition:color .15s; }
@@ -685,15 +665,15 @@
   .hero-toggle-opt:hover{ color:var(--text-muted); }
   .hero-toggle-opt.active{ color:var(--text); }
   .hero-toggle-opt.active .hero-toggle-dot{ background:#0a0a0a; border-color:#0a0a0a; }
-  .hero-figure{ text-align:center; margin:14px 0 2px; }
+  .hero-figure{ text-align:center; margin:22px 0 4px; }
   .hero-value{
-    font-family:var(--font-display); font-weight:800; letter-spacing:-.03em; color:#0a0a0a;
-    font-size:clamp(26px, 3.6vw, 44px); line-height:1.05; white-space:nowrap;
+    font-family:var(--font-display); font-weight:800; letter-spacing:-.035em; color:#0a0a0a;
+    font-size:clamp(34px, 5.4vw, 68px); line-height:1.03; white-space:nowrap;
   }
-  .hero-meta{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:6px; flex-wrap:wrap; }
+  .hero-meta{ display:flex; align-items:center; justify-content:center; gap:10px; margin-top:8px; flex-wrap:wrap; }
   .hero-sub{ font-size:11px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.12em; font-weight:700; }
   .hero-meta .sub{ margin-top:0; }
-  .hero-chart-head{ display:flex; align-items:center; justify-content:flex-end; margin-top:14px; gap:10px; flex-wrap:wrap; }
+  .hero-chart-head{ display:flex; align-items:center; justify-content:flex-end; margin-top:16px; gap:10px; flex-wrap:wrap; }
   .hero-horizon{ display:flex; align-items:center; gap:14px; }
   .hero-horizon-opt{
     font-size:11.5px; font-weight:600; color:var(--text-dim); padding-bottom:2px;
@@ -701,26 +681,20 @@
   }
   .hero-horizon-opt:hover{ color:var(--text-muted); }
   .hero-horizon-opt.active{ color:var(--text); border-color:#0a0a0a; font-weight:700; }
-  .hero-chart-wrap{ margin-top:6px; height:240px; position:relative; }
+  .hero-chart-wrap{ margin-top:8px; height:240px; position:relative; }
   @media (max-width:700px){ .hero-chart-wrap{ height:190px; } }
 
   /* ---------------- Mini card row (rich stat cards with sparkline) ---------------- */
   .mini-card-row{ display:grid; grid-template-columns:repeat(4,1fr); gap:14px; }
   @media (max-width:900px){ .mini-card-row{ grid-template-columns:repeat(2,1fr); } }
   .mini-card{
-    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:18px; padding:18px 20px;
-    overflow:hidden; transition:border-color .25s, transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:20px 22px;
+    overflow:hidden; transition:border-color .2s, transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s;
     animation:cellIn .5s cubic-bezier(.2,.8,.2,1) both;
   }
-  .mini-card::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2.5px; border-radius:18px 18px 0 0;
-    background:linear-gradient(90deg, transparent, var(--amber), transparent);
-    transform:scaleX(0); transform-origin:center; transition:transform .35s cubic-bezier(.2,.8,.2,1);
-  }
-  .mini-card:hover{ transform:translateY(-3px); border-color:rgba(0,0,0,.2); box-shadow:0 22px 40px -20px rgba(0,0,0,.2); }
-  .mini-card:hover::before{ transform:scaleX(1); }
+  .mini-card:hover{ transform:translateY(-1px); border-color:rgba(0,0,0,.12); box-shadow:0 10px 24px -18px rgba(0,0,0,.16); }
   .mini-card:has(.period-dd.open){ overflow:visible; }
-  .mini-card .label{ font-size:10.5px; color:var(--text-muted); font-weight:700; margin-bottom:9px; text-transform:uppercase; letter-spacing:.1em; }
+  .mini-card .label{ font-size:10.5px; color:var(--text-muted); font-weight:600; margin-bottom:10px; text-transform:uppercase; letter-spacing:.1em; }
   .mini-card .value{ font-family:var(--font-display); font-size:22px; font-weight:800; letter-spacing:-.01em; white-space:nowrap; overflow:hidden; }
   .mini-spark{ display:flex; align-items:flex-end; gap:3px; height:26px; margin-top:12px; }
   .mini-spark span{ flex:1; background:var(--amber-dim); border-radius:2px; min-height:4px; opacity:.6; }
@@ -733,37 +707,25 @@
   @media (max-width:980px){ .grid.cols-3{grid-template-columns:1fr;} .grid.cols-4{grid-template-columns:1fr 1fr;} .grid.cols-2{grid-template-columns:1fr;} }
 
   .panel{
-    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:18px;
-    padding:21px 23px; overflow:hidden; transition:border-color .25s, box-shadow .25s, transform .25s cubic-bezier(.2,.8,.2,1);
+    position:relative; background:var(--surface); border:1px solid var(--border); border-radius:16px;
+    padding:26px 28px; overflow:hidden; transition:border-color .2s, box-shadow .2s, transform .2s cubic-bezier(.2,.8,.2,1);
     animation:cellIn .5s cubic-bezier(.2,.8,.2,1) both; animation-delay:.06s;
   }
-  .panel::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2.5px; border-radius:18px 18px 0 0;
-    background:linear-gradient(90deg, transparent, var(--amber), transparent);
-    transform:scaleX(0); transform-origin:center; transition:transform .35s cubic-bezier(.2,.8,.2,1);
-  }
   .panel:hover{
-    transform:translateY(-2px); border-color:rgba(0,0,0,.2);
-    box-shadow:0 22px 40px -20px rgba(0,0,0,.18), inset 0 1px 0 rgba(255,255,255,.8);
+    transform:translateY(-1px); border-color:rgba(0,0,0,.12);
+    box-shadow:0 10px 24px -18px rgba(0,0,0,.14);
   }
-  .panel:hover::before{ transform:scaleX(1); }
   .panel-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:16px; }
   .panel-head h3{ font-size:14px; font-weight:700; letter-spacing:-.005em; }
   .panel-head .hint{ font-size:11px; color:var(--text-dim); font-family:var(--font-mono); }
 
-  .stat-card{ position:relative; background:var(--surface); border:1px solid var(--border); border-radius:16px; padding:16px 18px;
-    overflow:hidden; transition:border-color .25s, transform .25s cubic-bezier(.2,.8,.2,1), box-shadow .25s;
+  .stat-card{ position:relative; background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:18px 20px;
+    overflow:hidden; transition:border-color .2s, transform .2s cubic-bezier(.2,.8,.2,1), box-shadow .2s;
     animation:cellIn .5s cubic-bezier(.2,.8,.2,1) both; }
-  .stat-card::before{
-    content:''; position:absolute; top:0; left:0; right:0; height:2.5px; border-radius:16px 16px 0 0;
-    background:linear-gradient(90deg, transparent, var(--amber), transparent);
-    transform:scaleX(0); transform-origin:center; transition:transform .35s cubic-bezier(.2,.8,.2,1);
-  }
   .stat-card:hover{
-    transform:translateY(-3px); border-color:rgba(0,0,0,.2);
-    box-shadow:0 22px 40px -20px rgba(0,0,0,.2), inset 0 1px 0 rgba(255,255,255,.8);
+    transform:translateY(-1px); border-color:rgba(0,0,0,.12);
+    box-shadow:0 10px 24px -18px rgba(0,0,0,.16);
   }
-  .stat-card:hover::before{ transform:scaleX(1); }
   /* Same fix as .kpi-cell above: don't let the card's overflow:hidden clip the period
      dropdown menu (Revenue / Net profit cards) when it's open. */
   .stat-card:has(.period-dd.open){ overflow:visible; }
@@ -841,6 +803,21 @@
   }
   .heatmap-legend .hl-scale{ display:flex; gap:3px; }
   .heatmap-legend .hl-swatch{ width:18px; height:13px; border-radius:3px; box-shadow:inset 0 0 0 1px rgba(10,10,10,.06); }
+
+  /* ---------------- Offline status badge (fixed, visible across every view) ---------------- */
+  #offline-badge{
+    position:fixed; top:18px; right:28px; z-index:60;
+    display:flex; align-items:center; gap:8px;
+    background:#ffffff; border:1px solid var(--border); border-radius:999px;
+    padding:8px 14px 8px 12px; font-size:12px; font-weight:600; color:var(--text-muted);
+    box-shadow:0 10px 24px -14px rgba(0,0,0,.18);
+    animation:cellIn .3s cubic-bezier(.2,.8,.2,1) both;
+  }
+  #offline-badge.is-offline{ color:#8a2c2e; border-color:rgba(201,75,79,.3); background:#fdf4f4; }
+  .offline-badge-dot{ width:7px; height:7px; border-radius:50%; background:#8a8a8a; flex-shrink:0; }
+  #offline-badge.is-offline .offline-badge-dot{ animation:pulseDot 1.6s ease-in-out infinite; }
+  @keyframes pulseDot{ 0%,100%{ opacity:1; } 50%{ opacity:.35; } }
+  @media (max-width:860px){ #offline-badge{ top:auto; bottom:18px; right:16px; left:16px; justify-content:center; } }
 
   /* ---------------- Intelligent analytics ---------------- */
   .insight-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(230px, 1fr)); gap:12px; margin-top:14px; }
@@ -1306,6 +1283,10 @@
   </aside>
 
   <main id="main">
+    <div id="offline-badge" style="display:none;">
+      <span class="offline-badge-dot"></span>
+      <span class="offline-badge-label">Offline</span>
+    </div>
     <div id="main-loading"><span class="loader"></span> Loading your business…</div>
     <div id="main-content" style="display:none;">
 
@@ -2099,6 +2080,149 @@ const ANALYTICS_DAYS = 28; // window used for sales performance + peak trading a
 let cache = { orders: [], products: [], customers: [], inventory: [], expenses: [] };
 let STAFF_DIRECTORY = []; // { id, full_name, role, pin_hash } for cashier/kitchen staff in this business — powers Switch User / Manage PINs
 
+/* =====================================================================================
+   OFFLINE SUPPORT
+   Scope, deliberately: this keeps the TILL usable through a connectivity drop *during
+   an already-logged-in shift* (flaky wifi, a router blip, load-shedding) — it does not
+   let someone open the app and log in from a cold start with zero connection, because
+   sign-in itself is a live Supabase Auth call by design (see the note above `boot()`:
+   sessions are intentionally never silently resumed on a shared till). What this DOES
+   cover: if the network drops mid-shift, completeSale() queues the sale locally instead
+   of failing, the cashier keeps ringing up items against the last-known product cache,
+   and everything queued replays through the server the moment connectivity returns —
+   using the exact same idempotency key it would have used online, so a sale can never
+   be double-recorded even if sync retries partway through.
+===================================================================================== */
+const OFFLINE_QUEUE_KEY = 'pos_offline_sale_queue_v1';
+const PRODUCTS_CACHE_KEY = 'pos_offline_products_cache_v1';
+let offlineSyncInFlight = false;
+
+function isOnline(){ return typeof navigator === 'undefined' ? true : navigator.onLine; }
+
+// A network-shaped failure (dropped connection, DNS hiccup, request never left the
+// device) vs a real server-side rejection (bad schema, constraint violation, RLS
+// denial) need different handling: the former should queue the sale for later, the
+// latter is a genuine error the cashier needs to see right now. supabase-js surfaces
+// a dropped request as a plain fetch TypeError, so that — plus navigator.onLine having
+// flipped false while the request was in flight — is what distinguishes the two.
+function isNetworkError(err){
+  if (!isOnline()) return true;
+  if (!err) return false;
+  if (err instanceof TypeError) return true;
+  const msg = String(err.message || err);
+  return /failed to fetch|network|load failed|ERR_INTERNET|ERR_CONNECTION/i.test(msg);
+}
+
+function getOfflineQueue(){
+  try {
+    const raw = localStorage.getItem(OFFLINE_QUEUE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) { return []; }
+}
+function setOfflineQueue(queue){
+  try { localStorage.setItem(OFFLINE_QUEUE_KEY, JSON.stringify(queue)); }
+  catch (err) { console.error('Could not persist offline sale queue:', err); }
+}
+
+function saveProductsCache(products){
+  try { localStorage.setItem(PRODUCTS_CACHE_KEY, JSON.stringify(products)); }
+  catch (err) { /* storage full/unavailable — the in-memory copy still works this session */ }
+}
+function loadProductsCache(){
+  try {
+    const raw = localStorage.getItem(PRODUCTS_CACHE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (err) { return []; }
+}
+
+// Queues one fully-self-contained sale (everything writeSaleToServer() needs — no
+// reliance on posCart/posDiscount/etc, which may have already changed by sync time).
+// Also optimistically decrements local stock so the POS grid reflects what's actually
+// left on the shelf until the real trigger-driven deduction lands on sync.
+function queueOfflineSale(sale){
+  const queue = getOfflineQueue();
+  queue.push(sale);
+  setOfflineQueue(queue);
+  sale.items.forEach(it => {
+    const p = cache.products.find(p => String(p.id) === String(it.product_id));
+    if (p) p.current_stock = Math.max(0, Number(p.current_stock) - Number(it.quantity));
+  });
+  updateOfflineBadge();
+}
+
+// Replays every queued sale through the exact same server write path a live sale
+// uses. Stops at the first still-offline failure (leaves the rest queued, in order,
+// for the next attempt) but a genuine server-side rejection on one sale is flagged
+// and skipped rather than silently blocking every sale queued after it forever.
+async function flushOfflineQueue(){
+  if (offlineSyncInFlight || !isOnline()) return;
+  const queue = getOfflineQueue();
+  if (!queue.length) { updateOfflineBadge(); return; }
+  offlineSyncInFlight = true;
+  updateOfflineBadge();
+  let syncedAny = false;
+  try {
+    while (queue.length) {
+      const sale = queue[0];
+      try {
+        await writeSaleToServer(sale);
+        queue.shift();
+        setOfflineQueue(queue);
+        syncedAny = true;
+      } catch (err) {
+        if (isNetworkError(err)) break; // still offline (or dropped again) — try again later
+        console.error('Offline sale failed to sync (kept in queue, flagged):', sale.saleKey, err);
+        sale._syncError = err.message || String(err);
+        setOfflineQueue(queue);
+        break; // don't let one bad record block the ones behind it forever — surface it and stop this pass
+      }
+    }
+  } finally {
+    offlineSyncInFlight = false;
+    updateOfflineBadge();
+    if (syncedAny) {
+      invalidatePeriodCache();
+      await Promise.allSettled([loadOrders(), loadKpis(), loadProducts(), loadInventory(), loadMovements(), loadCustomers()]);
+      renderSalesPerformanceCards();
+      renderPosGrid();
+      renderLowStock();
+      showPosToast('Queued offline sale(s) synced.');
+    }
+  }
+}
+
+function updateOfflineBadge(){
+  const badge = document.getElementById('offline-badge');
+  if (!badge) return;
+  const queue = getOfflineQueue();
+  const flagged = queue.filter(s => s._syncError).length;
+  if (isOnline() && !queue.length) {
+    badge.style.display = 'none';
+    return;
+  }
+  badge.style.display = 'flex';
+  badge.classList.toggle('is-offline', !isOnline());
+  const dot = badge.querySelector('.offline-badge-dot');
+  const label = badge.querySelector('.offline-badge-label');
+  if (dot) dot.style.background = isOnline() ? '#8a8a8a' : '#c94b4f';
+  if (!isOnline()) {
+    label.textContent = queue.length ? `Offline · ${queue.length} sale${queue.length === 1 ? '' : 's'} queued` : 'Offline';
+  } else if (offlineSyncInFlight) {
+    label.textContent = `Syncing ${queue.length} sale${queue.length === 1 ? '' : 's'}…`;
+  } else if (flagged) {
+    label.textContent = `${flagged} sale${flagged === 1 ? '' : 's'} need attention`;
+  } else {
+    label.textContent = `${queue.length} sale${queue.length === 1 ? '' : 's'} queued`;
+  }
+}
+
+window.addEventListener('online', () => { updateOfflineBadge(); flushOfflineQueue(); });
+window.addEventListener('offline', updateOfflineBadge);
+// Safety net: some browsers/routers don't fire the online/offline events reliably
+// (e.g. a captive portal or a router that silently drops packets rather than resetting
+// the interface), so also retry periodically whenever there's something queued.
+setInterval(() => { if (getOfflineQueue().length) flushOfflineQueue(); }, 20000);
+
 const fmtMoney = (n) => new Intl.NumberFormat('en-ZA', { style:'currency', currency: CURRENCY }).format(Number(n||0));
 // Compact form for tight spaces (e.g. the heatmap's per-row totals) — "R17.2k" instead
 // of "R17 234.50". Falls back to fmtMoney if the browser lacks compact-notation support.
@@ -2862,6 +2986,11 @@ async function loadAll(){
   wireTillModals();
   wireAddProductModal();
   wireGrowthTargetEditor();
+  // Restore + retry anything left queued from a previous session that never made
+  // it back to the server (e.g. the tab was closed mid-outage) as soon as we know
+  // where things stand.
+  updateOfflineBadge();
+  flushOfflineQueue();
 }
 
 function showLoadWarning(failures){
@@ -4831,14 +4960,22 @@ async function processRefund(order, reason){
 }
 
 async function loadProducts(){
-  const { data, error } = await sb
-    .from('products')
-    .select('id, name, sku, cost_price, selling_price, current_stock, minimum_stock, unit, status')
-    .eq('business_id', BUSINESS_ID)
-    .order('name', { ascending: true })
-    .limit(300);
-  assertNoError(error, 'products');
-  cache.products = data || [];
+  try {
+    const { data, error } = await sb
+      .from('products')
+      .select('id, name, sku, cost_price, selling_price, current_stock, minimum_stock, unit, status')
+      .eq('business_id', BUSINESS_ID)
+      .order('name', { ascending: true })
+      .limit(300);
+    assertNoError(error, 'products');
+    cache.products = data || [];
+    saveProductsCache(cache.products); // last-known-good snapshot, used if a future fetch fails offline
+  } catch (err) {
+    const cached = loadProductsCache();
+    if (!cached.length) throw err; // nothing to fall back to — surface the real error
+    cache.products = cached;
+    console.warn('loadProducts failed — showing last cached product catalog instead:', err);
+  }
   renderProductsTable(cache.products);
 }
 
@@ -5555,8 +5692,10 @@ async function completeSale(){
   // Phase 3: a sale cannot be taken with no till open — this is what makes
   // "expected vs counted cash" at close mean anything. Re-check freshly rather
   // than trusting the in-memory TILL_SESSION, in case it was closed from
-  // another tab/device in the last few seconds.
-  if (!TILL_SESSION) {
+  // another tab/device in the last few seconds. Skipped while offline — there's
+  // nothing to re-check against, and the till was already confirmed open the
+  // last time this device had a connection.
+  if (!TILL_SESSION && isOnline()) {
     await loadTillSession();
     if (!TILL_SESSION) {
       errBox.textContent = 'No till is open on this device. Open a till before taking payments.';
@@ -5598,188 +5737,46 @@ async function completeSale(){
   // Cooked into both the order row (customer_id, so Orders/CRM can join back to
   // this sale) and the receipt image below. Optional — resolvePosCustomer() is a
   // no-op returning null if the Customer fields were left blank for this sale.
+  // Skipped entirely while offline — there's no connection to resolve/create the
+  // customer record against yet; the typed details travel with the queued sale
+  // and get resolved for real inside writeSaleToServer() once it syncs.
   const customerInput = getPosCustomerInput();
-  const customerRecord = await resolvePosCustomer(customerInput);
+  const customerRecord = isOnline() ? await resolvePosCustomer(customerInput) : null;
 
-  try {
-    // Guard against duplicate submission: if this exact checkout attempt already
-    // reached the server (e.g. the network dropped after insert but before the
-    // response came back, and the cashier hit Pay again), the earlier insert is
-    // already there — reuse it instead of creating a second sale for the same cart.
-    const { data: existing, error: lookupErr } = await sb
-      .from('orders')
-      .select('id')
-      .eq('business_id', BUSINESS_ID)
-      .eq('idempotency_key', saleKey)
-      .maybeSingle();
-    if (lookupErr) throw lookupErr;
+  // A fully self-contained snapshot of this sale — everything writeSaleToServer()
+  // needs to write it, independent of posCart/posDiscount/posSplitTenders, which
+  // may have already moved on to the NEXT sale by the time this one actually syncs.
+  const sale = {
+    saleKey, orderNumber, clientInitiatedAt,
+    customerId: customerRecord?.id || null,
+    customerInput,
+    dbPaymentMethod,
+    subtotal, discount, tax, total,
+    tillSessionId: TILL_SESSION?.id || null,
+    cartSnapshot: posCart.map(l => ({ id: l.id, price: l.price, qty: l.qty })),
+    splitTenders: dbPaymentMethod === 'split' ? (posSplitTenders || []).map(t => ({ ...t })) : null,
+  };
 
-    let order = existing;
-    if (!order) {
-      const { data: inserted, error: orderErr } = await sb
-        .from('orders')
-        .insert({
-          business_id: BUSINESS_ID,
-          branch_id: BRANCH_ID,
-          cashier_id: CASHIER_ID,
-          customer_id: customerRecord?.id || null,
-          order_number: orderNumber,
-          idempotency_key: saleKey,
-          device_id: TERMINAL_ID,
-          client_initiated_at: clientInitiatedAt,
-          status: 'completed',
-          payment_method: dbPaymentMethod,
-          subtotal: subtotal,
-          discount_amount: discount,
-          vat_amount: tax,
-          total_amount: total,
-        })
-        .select('id')
-        .single();
-      if (orderErr) throw orderErr;
-      order = inserted;
-    }
+  const soldItems = posCart; // captured before the cart is cleared, for the receipt image below
+  const paidVia = dbPaymentMethod === 'split'
+    ? 'split payment (' + (posSplitTenders || []).filter(t => t.amount > 0).map(t => t.method).join(' + ') + ')'
+    : posPaymentMethod;
 
-    // If the order row already existed (a retry of this saleKey), check whether its
-    // line items were already written too. Without this, a retry that only failed on
-    // the items insert last time would insert items a second time — and since stock
-    // reduction is trigger-driven off order_items, that would silently double-deduct
-    // stock even though only one sale ever happened.
-    let itemsAlreadyWritten = false;
-    if (order === existing) {
-      const { count, error: itemsCheckErr } = await sb
-        .from('order_items')
-        .select('id', { count: 'exact', head: true })
-        .eq('order_id', order.id);
-      if (itemsCheckErr) throw itemsCheckErr;
-      itemsAlreadyWritten = !!count;
-    }
-
-    if (!itemsAlreadyWritten) {
-      const { subtotal: orderSubtotal, tax: orderTax } = posTotals();
-      // Each line's subtotal/tax is rounded independently, but rounding N lines
-      // independently doesn't guarantee they sum to exactly orderSubtotal/orderTax
-      // (e.g. three lines each rounding up by half a cent). Rather than let the
-      // order header and its line items silently disagree by a fraction of a
-      // cent, the LAST line absorbs whatever remainder is left after the others
-      // are rounded — a standard invoicing pattern, and it means
-      // sum(order_items.subtotal) === orders.subtotal and
-      // sum(order_items.tax_amount) === orders.vat_amount ALWAYS hold exactly.
-      let subtotalRunning = 0, taxRunning = 0;
-      const items = posCart.map((l, idx) => {
-        const isLast = idx === posCart.length - 1;
-        const rawLineSubtotal = l.price * l.qty;
-        const lineSubtotal = isLast
-          ? roundCents(orderSubtotal - subtotalRunning)
-          : roundCents(rawLineSubtotal);
-        const lineTax = isLast
-          ? roundCents(orderTax - taxRunning)
-          : roundCents(rawLineSubtotal * POS_TAX_RATE);
-        subtotalRunning = roundCents(subtotalRunning + lineSubtotal);
-        taxRunning = roundCents(taxRunning + lineTax);
-        return {
-          business_id: BUSINESS_ID,
-          order_id: order.id,
-          product_id: l.id,
-          quantity: l.qty,
-          unit_price: l.price,
-          discount_amount: 0,
-          tax_amount: lineTax,
-          subtotal: lineSubtotal,
-        };
-      });
-      const { error: itemsErr } = await sb.from('order_items').insert(items);
-      if (itemsErr) throw itemsErr;
-
-      // Split tenders are written alongside items, in the same not-yet-written guard —
-      // they're part of recording this one sale, not a separate retryable step.
-      if (dbPaymentMethod === 'split' && posSplitTenders && posSplitTenders.length) {
-        const splits = posSplitTenders.map(t => ({
-          business_id: BUSINESS_ID,
-          order_id: order.id,
-          payment_method: POS_PAYMENT_DB_MAP[t.method] || t.method,
-          amount: t.amount,
-        }));
-        const { error: splitsErr } = await sb.from('order_payment_splits').insert(splits);
-        if (splitsErr) throw splitsErr;
-      }
-
-      // ---- Payment ledger (Phase 3) ----
-      // One payments row per tender — a split sale gets one row per method. Every
-      // row is inserted 'initiated' and then WALKED through its real lifecycle via
-      // transitionPayment(), so the state history is genuine rather than a single
-      // final value written once. Cash/loyalty settle immediately — the money is
-      // already in the drawer, there's no gateway round-trip to wait on.
-      // Card/EFT/mobile pass through 'processing' -> 'approved': there's no live
-      // gateway integration wired up yet, so this assumes the cashier already saw
-      // approval on the physical card machine before clicking Pay here. If that
-      // assumption turns out wrong for a given sale (terminal actually declined,
-      // or the result was never confirmed), staff resolve it afterwards from the
-      // Payment Exceptions queue in Reconciliation rather than blocking checkout
-      // on it now — speed at the till matters more than catching that edge case
-      // in the moment. A write failure here is logged and surfaced but does NOT
-      // undo the sale — the money already changed hands at the till; a missing or
-      // stuck ledger row is a reconciliation gap to catch, not a reason to roll
-      // back a completed sale.
-      try {
-        const tenders = (dbPaymentMethod === 'split' && posSplitTenders && posSplitTenders.length)
-          ? posSplitTenders.map(t => ({ method: POS_PAYMENT_DB_MAP[t.method] || t.method, amount: t.amount }))
-          : [{ method: dbPaymentMethod, amount: total }];
-        const paymentRows = tenders.map(t => ({
-          business_id: BUSINESS_ID,
-          branch_id: BRANCH_ID,
-          order_id: order.id,
-          till_session_id: TILL_SESSION?.id || null,
-          device_id: TERMINAL_ID,
-          cashier_id: CASHIER_ID,
-          payment_method: t.method,
-          direction: 'sale',
-          amount: t.amount,
-          state: 'initiated',
-        }));
-        const { data: insertedPayments, error: paymentsErr } = await sb
-          .from('pos_payments').insert(paymentRows).select('id, payment_method');
-        if (paymentsErr) throw paymentsErr;
-
-        for (const p of (insertedPayments || [])) {
-          const isCashLike = p.payment_method === 'cash' || p.payment_method === 'loyalty_points';
-          if (isCashLike) {
-            await transitionPayment(p.id, 'settled', { reason: 'Cash/loyalty settles at the till' });
-          } else {
-            await transitionPayment(p.id, 'processing', { reason: 'Electronic tender submitted' });
-            await transitionPayment(p.id, 'approved', { reason: 'Assumed approved — no live gateway integration yet' });
-          }
-        }
-      } catch (payErr) {
-        console.error('Payment ledger write failed (sale already recorded):', payErr);
-        showPosToast('Sale recorded, but the payment ledger entry failed — flag this for reconciliation.', true);
-      }
-
-      await logOrderEvent(order.id, 'sale_completed', {
-        amount: total,
-        metadata: {
-          payment_method: dbPaymentMethod,
-          split_tenders: dbPaymentMethod === 'split' ? (posSplitTenders || []) : undefined,
-        },
-      });
-    }
-
-    // NOTE: stock reduction, the inventory row upsert, and the stock_movements log
-    // are all handled server-side by the trg_order_items_reduce_stock trigger on
-    // order_items — don't duplicate that here. Just reload the affected views.
-    const soldItems = posCart; // captured before the cart is cleared, for the receipt image below
+  // Shared tail for both the live and offline-queued paths: clear the cart, print
+  // the receipt (purely client-side — never depends on the network either way) and
+  // refresh the POS grid from whatever's in local cache.
+  function finishLocally(offline){
     posCart = [];
     posDiscount = { type: 'percent', value: 0 };
-    const paidVia = dbPaymentMethod === 'split'
-      ? 'split payment (' + (posSplitTenders || []).filter(t => t.amount > 0).map(t => t.method).join(' + ') + ')'
-      : posPaymentMethod;
-    resetPosSaleKey(); // sale is durably complete — next checkout is a new transaction (also clears posSplitTenders)
+    resetPosSaleKey(); // sale is durably complete (or durably queued) — next checkout is a new transaction
     resetPosReceiptFields();
     renderPosCart();
-    showPosToast(`Sale completed — ${fmtMoney(total)} via ${paidVia}.`);
+    showPosToast(offline
+      ? `Sale saved offline — ${fmtMoney(total)} via ${paidVia}. Will sync automatically once you're back online.`
+      : `Sale completed — ${fmtMoney(total)} via ${paidVia}.`);
     // The whole reason "Prepare Receipt" gates checkout: as soon as the sale is
-    // durably recorded, bake the business, order and customer details into a JPEG
-    // and hand it straight to the browser's download flow.
+    // durably recorded (or durably queued), bake the business, order and customer
+    // details into a JPEG and hand it straight to the browser's download flow.
     downloadReceiptImage({
       business: document.getElementById('sb-biz-name')?.textContent || 'Business',
       branch: AUTH_PROFILE?.branches?.name || '',
@@ -5792,22 +5789,225 @@ async function completeSale(){
       paymentLabel: paidVia.charAt(0).toUpperCase() + paidVia.slice(1),
       customer: customerRecord ? { name: customerRecord.full_name, phone: customerRecord.phone, email: customerRecord.email } : customerInput,
     });
+    renderPosGrid();
+    renderLowStock();
+  }
+
+  if (!isOnline()) {
+    queueOfflineSale(sale);
+    finishLocally(true);
+    posBusy = false;
+    btn.innerHTML = originalHtml;
+    btn.disabled = posCart.length === 0;
+    return;
+  }
+
+  try {
+    await writeSaleToServer(sale);
+    finishLocally(false);
     invalidatePeriodCache();
     await Promise.allSettled([loadOrders(), loadKpis(), loadProducts(), loadInventory(), loadMovements(), loadCustomers()]);
     renderSalesPerformanceCards();
-    renderPosGrid();
-    renderLowStock();
   } catch (err) {
-    errBox.textContent = 'Could not save this sale: ' + (err.message || String(err)) +
-      '. Your Supabase schema may use different column names for orders/order_items — check the console for details.';
-    errBox.style.display = 'block';
-    console.error('completeSale failed:', err);
-    showPosToast('Sale not saved — see error below.', true);
+    if (isNetworkError(err)) {
+      // Connection dropped mid-checkout (or right as we tried) — this sale is not
+      // lost, it just becomes a queued one, exactly as if we'd known upfront.
+      queueOfflineSale(sale);
+      finishLocally(true);
+    } else {
+      errBox.textContent = 'Could not save this sale: ' + (err.message || String(err)) +
+        '. Your Supabase schema may use different column names for orders/order_items — check the console for details.';
+      errBox.style.display = 'block';
+      console.error('completeSale failed:', err);
+      showPosToast('Sale not saved — see error below.', true);
+    }
   } finally {
     posBusy = false;
     btn.innerHTML = originalHtml;
     btn.disabled = posCart.length === 0;
   }
+}
+
+// The single write path for "record this sale on the server" — used both by
+// completeSale() on the live/online path AND by flushOfflineQueue() replaying a
+// sale that was taken while offline. Takes a fully self-contained `sale` object
+// (see completeSale() above) rather than reading posCart/posDiscount/etc directly,
+// since by sync time those may already describe a completely different, later sale.
+async function writeSaleToServer(sale){
+  const {
+    saleKey, orderNumber, clientInitiatedAt, customerId, customerInput,
+    dbPaymentMethod, subtotal, discount, tax, total, tillSessionId,
+    cartSnapshot, splitTenders,
+  } = sale;
+
+  // Guard against duplicate submission: if this exact checkout attempt already
+  // reached the server (e.g. the network dropped after insert but before the
+  // response came back, and this got queued and retried), the earlier insert is
+  // already there — reuse it instead of creating a second sale for the same cart.
+  const { data: existing, error: lookupErr } = await sb
+    .from('orders')
+    .select('id')
+    .eq('business_id', BUSINESS_ID)
+    .eq('idempotency_key', saleKey)
+    .maybeSingle();
+  if (lookupErr) throw lookupErr;
+
+  // A customer typed in while offline couldn't be resolved/created at the time —
+  // do it now that there's actually a connection to do it against.
+  let resolvedCustomerId = customerId;
+  if (!resolvedCustomerId && customerInput) {
+    const customerRecord = await resolvePosCustomer(customerInput);
+    resolvedCustomerId = customerRecord?.id || null;
+  }
+
+  let order = existing;
+  if (!order) {
+    const { data: inserted, error: orderErr } = await sb
+      .from('orders')
+      .insert({
+        business_id: BUSINESS_ID,
+        branch_id: BRANCH_ID,
+        cashier_id: CASHIER_ID,
+        customer_id: resolvedCustomerId,
+        order_number: orderNumber,
+        idempotency_key: saleKey,
+        device_id: TERMINAL_ID,
+        client_initiated_at: clientInitiatedAt,
+        status: 'completed',
+        payment_method: dbPaymentMethod,
+        subtotal: subtotal,
+        discount_amount: discount,
+        vat_amount: tax,
+        total_amount: total,
+      })
+      .select('id')
+      .single();
+    if (orderErr) throw orderErr;
+    order = inserted;
+  }
+
+  // If the order row already existed (a retry of this saleKey), check whether its
+  // line items were already written too. Without this, a retry that only failed on
+  // the items insert last time would insert items a second time — and since stock
+  // reduction is trigger-driven off order_items, that would silently double-deduct
+  // stock even though only one sale ever happened.
+  let itemsAlreadyWritten = false;
+  if (order === existing) {
+    const { count, error: itemsCheckErr } = await sb
+      .from('order_items')
+      .select('id', { count: 'exact', head: true })
+      .eq('order_id', order.id);
+    if (itemsCheckErr) throw itemsCheckErr;
+    itemsAlreadyWritten = !!count;
+  }
+
+  if (!itemsAlreadyWritten) {
+    // Each line's subtotal/tax is rounded independently, but rounding N lines
+    // independently doesn't guarantee they sum to exactly subtotal/tax (e.g. three
+    // lines each rounding up by half a cent). Rather than let the order header and
+    // its line items silently disagree by a fraction of a cent, the LAST line
+    // absorbs whatever remainder is left after the others are rounded — a standard
+    // invoicing pattern, and it means sum(order_items.subtotal) === orders.subtotal
+    // and sum(order_items.tax_amount) === orders.vat_amount ALWAYS hold exactly.
+    let subtotalRunning = 0, taxRunning = 0;
+    const items = cartSnapshot.map((l, idx) => {
+      const isLast = idx === cartSnapshot.length - 1;
+      const rawLineSubtotal = l.price * l.qty;
+      const lineSubtotal = isLast
+        ? roundCents(subtotal - subtotalRunning)
+        : roundCents(rawLineSubtotal);
+      const lineTax = isLast
+        ? roundCents(tax - taxRunning)
+        : roundCents(rawLineSubtotal * POS_TAX_RATE);
+      subtotalRunning = roundCents(subtotalRunning + lineSubtotal);
+      taxRunning = roundCents(taxRunning + lineTax);
+      return {
+        business_id: BUSINESS_ID,
+        order_id: order.id,
+        product_id: l.id,
+        quantity: l.qty,
+        unit_price: l.price,
+        discount_amount: 0,
+        tax_amount: lineTax,
+        subtotal: lineSubtotal,
+      };
+    });
+    const { error: itemsErr } = await sb.from('order_items').insert(items);
+    if (itemsErr) throw itemsErr;
+
+    // Split tenders are written alongside items, in the same not-yet-written guard —
+    // they're part of recording this one sale, not a separate retryable step.
+    if (dbPaymentMethod === 'split' && splitTenders && splitTenders.length) {
+      const splits = splitTenders.map(t => ({
+        business_id: BUSINESS_ID,
+        order_id: order.id,
+        payment_method: POS_PAYMENT_DB_MAP[t.method] || t.method,
+        amount: t.amount,
+      }));
+      const { error: splitsErr } = await sb.from('order_payment_splits').insert(splits);
+      if (splitsErr) throw splitsErr;
+    }
+
+    // ---- Payment ledger (Phase 3) ----
+    // One payments row per tender — a split sale gets one row per method. Every
+    // row is inserted 'initiated' and then WALKED through its real lifecycle via
+    // transitionPayment(), so the state history is genuine rather than a single
+    // final value written once. Cash/loyalty settle immediately — the money is
+    // already in the drawer, there's no gateway round-trip to wait on.
+    // Card/EFT/mobile pass through 'processing' -> 'approved': there's no live
+    // gateway integration wired up yet, so this assumes the cashier already saw
+    // approval on the physical card machine before clicking Pay here (or, for a
+    // sale that was queued offline, before it was queued). A write failure here is
+    // logged and surfaced but does NOT undo the sale — the money already changed
+    // hands at the till; a missing or stuck ledger row is a reconciliation gap to
+    // catch, not a reason to roll back a completed sale.
+    try {
+      const tenders = (dbPaymentMethod === 'split' && splitTenders && splitTenders.length)
+        ? splitTenders.map(t => ({ method: POS_PAYMENT_DB_MAP[t.method] || t.method, amount: t.amount }))
+        : [{ method: dbPaymentMethod, amount: total }];
+      const paymentRows = tenders.map(t => ({
+        business_id: BUSINESS_ID,
+        branch_id: BRANCH_ID,
+        order_id: order.id,
+        till_session_id: tillSessionId,
+        device_id: TERMINAL_ID,
+        cashier_id: CASHIER_ID,
+        payment_method: t.method,
+        direction: 'sale',
+        amount: t.amount,
+        state: 'initiated',
+      }));
+      const { data: insertedPayments, error: paymentsErr } = await sb
+        .from('pos_payments').insert(paymentRows).select('id, payment_method');
+      if (paymentsErr) throw paymentsErr;
+
+      for (const p of (insertedPayments || [])) {
+        const isCashLike = p.payment_method === 'cash' || p.payment_method === 'loyalty_points';
+        if (isCashLike) {
+          await transitionPayment(p.id, 'settled', { reason: 'Cash/loyalty settles at the till' });
+        } else {
+          await transitionPayment(p.id, 'processing', { reason: 'Electronic tender submitted' });
+          await transitionPayment(p.id, 'approved', { reason: 'Assumed approved — no live gateway integration yet' });
+        }
+      }
+    } catch (payErr) {
+      console.error('Payment ledger write failed (sale already recorded):', payErr);
+      showPosToast('Sale recorded, but the payment ledger entry failed — flag this for reconciliation.', true);
+    }
+
+    await logOrderEvent(order.id, 'sale_completed', {
+      amount: total,
+      metadata: {
+        payment_method: dbPaymentMethod,
+        split_tenders: dbPaymentMethod === 'split' ? (splitTenders || []) : undefined,
+      },
+    });
+  }
+
+  // NOTE: stock reduction, the inventory row upsert, and the stock_movements log
+  // are all handled server-side by the trg_order_items_reduce_stock trigger on
+  // order_items — don't duplicate that here.
+  return order.id;
 }
 
 function resetPosReceiptFields(){
