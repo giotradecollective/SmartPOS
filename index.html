@@ -924,6 +924,10 @@
   .badge.inactive, .badge.discontinued{ background:var(--raised); color:var(--text-dim); }
   .badge.approved{ background:rgba(255,255,255,.08); color:var(--amber-dim); }
   .badge.unknown{ background:rgba(242,85,90,.08); color:var(--red-dim); }
+  /* Locally-queued sales not yet on the server — distinct from the real 'pending'
+     order status above, so filtering Orders by "Pending" doesn't pull these in. */
+  .badge.offline_pending{ background:var(--raised); color:var(--text-muted); }
+  .badge.offline_failed{ background:rgba(242,85,90,.12); color:var(--red); }
 
   .search-row{ display:flex; gap:10px; margin-bottom:16px; flex-wrap:wrap; }
   .search-row input, .search-row select{
@@ -1604,7 +1608,7 @@
                  and customer details baked in — is generated client-side and downloaded
                  automatically (downloadReceiptImage(), called from completeSale()). -->
             <label class="pos-receipt-toggle" for="pos-prepare-receipt">
-              <input type="checkbox" id="pos-prepare-receipt" />
+              <input type="checkbox" id="pos-prepare-receipt" checked />
               <span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 2h9l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z"/><path d="M9 13h6M9 17h6M9 9h2"/></svg>
                 Prepare Receipt
@@ -1664,6 +1668,8 @@
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
             <option value="refunded">Refunded</option>
+            <option value="offline_pending">Offline · unsynced</option>
+            <option value="offline_failed">Offline · sync failed</option>
           </select>
         </div>
         <div class="panel" style="padding:0; overflow-x:auto;">
@@ -2175,6 +2181,45 @@ function queueOfflineSale(sale){
     if (p) p.current_stock = Math.max(0, Number(p.current_stock) - Number(it.qty));
   });
   updateOfflineBadge();
+  refreshOrdersView(); // surface it in Orders immediately — see offlineQueueAsOrderRows() below
+}
+
+// Turns each still-queued sale into an order-shaped row so it shows up in the Orders
+// table right away instead of only appearing once it's actually reached the server —
+// see completeSale()/queueOfflineSale() above. Uses status 'pending'/'failed' so the
+// existing badge CSS (.badge.pending / .badge.failed) applies with no new styling,
+// with a clearer label than the raw status shown via `_label`.
+function offlineQueueAsOrderRows(){
+  return getOfflineQueue().map(sale => ({
+    id: 'offline-' + sale.saleKey,
+    order_number: sale.orderNumber,
+    status: sale._syncError ? 'offline_failed' : 'offline_pending',
+    _label: sale._syncError ? 'Sync failed' : 'Offline · pending sync',
+    subtotal: sale.subtotal, discount_amount: sale.discount, vat_amount: sale.tax, total_amount: sale.total,
+    payment_method: sale.dbPaymentMethod,
+    device_id: TERMINAL_ID,
+    original_order_id: null,
+    created_at: sale.clientInitiatedAt,
+    customers: sale.customerInput?.name ? { full_name: sale.customerInput.name } : null,
+    profiles: { full_name: AUTH_PROFILE?.full_name || 'Staff' },
+    _offline: true,
+  }));
+}
+// Queued (not-yet-synced) sales first, newest-first, ahead of the server's own list —
+// a cashier checking Orders mid-shift should see what they just rang up at the top.
+function mergedOrdersList(){
+  return [...offlineQueueAsOrderRows(), ...cache.orders];
+}
+// Re-renders whatever Orders views are currently on screen from the merged list.
+// Safe to call any time — the elements always exist in the DOM once the app has
+// booted, whether or not the Orders tab happens to be the one currently visible.
+function refreshOrdersView(){
+  if (typeof renderRecentOrders !== 'function' || !document.getElementById('recent-orders-body')) return;
+  renderRecentOrders();
+  const search = document.getElementById('orders-search');
+  const status = document.getElementById('orders-status-filter');
+  if (search && status) filterOrders();
+  else renderOrdersTable(mergedOrdersList());
 }
 
 // Replays every queued sale through the exact same server write path a live sale
@@ -2207,6 +2252,7 @@ async function flushOfflineQueue(){
   } finally {
     offlineSyncInFlight = false;
     updateOfflineBadge();
+    refreshOrdersView(); // picks up newly-flagged failures even on a pass that synced nothing
     if (syncedAny) {
       invalidatePeriodCache();
       await Promise.allSettled([loadOrders(), loadKpis(), loadProducts(), loadInventory(), loadMovements(), loadCustomers()]);
@@ -4756,18 +4802,18 @@ async function loadOrders(){
   cache.orders = data || [];
   document.getElementById('orders-count-hint').textContent = cache.orders.length + ' loaded';
   renderRecentOrders();
-  renderOrdersTable(cache.orders);
+  renderOrdersTable(mergedOrdersList());
 }
 
 function renderRecentOrders(){
-  const rows = cache.orders.slice(0, 6);
+  const rows = mergedOrdersList().slice(0, 6);
   const body = document.getElementById('recent-orders-body');
   if (!rows.length) { body.innerHTML = `<tr><td colspan="4">${emptyState('No orders yet.')}</td></tr>`; return; }
   body.innerHTML = rows.map(o => `
     <tr>
       <td class="mono">${esc(o.order_number || o.id.slice(0,8))}</td>
       <td>${esc(o.customers?.full_name || 'Walk-in')}</td>
-      <td><span class="badge ${o.status}">${o.status}</span></td>
+      <td><span class="badge ${o.status}">${esc(o._label || o.status)}</span></td>
       <td class="num">${fmtMoney(o.total_amount)}</td>
     </tr>`).join('');
 }
@@ -4785,7 +4831,7 @@ function renderOrdersTable(list){
       <td class="muted">${esc(o.profiles?.full_name || '—')}</td>
       <td class="mono muted">${esc(o.device_id || '—')}</td>
       <td class="muted" style="text-transform:capitalize;">${esc(o.payment_method || '—')}</td>
-      <td><span class="badge ${o.status}">${o.status}</span></td>
+      <td><span class="badge ${o.status}">${esc(o._label || o.status)}</span></td>
       <td class="num" style="padding-right:20px;">${fmtMoney(o.total_amount)}</td>
       <td class="muted">${fmtDateTime(o.created_at)}</td>
       <td style="padding-right:20px;">${refundable ? `<button class="refund-btn" data-id="${esc(o.id)}" title="Refund"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 7v6h6M3 13a9 9 0 1 0 3-6.7L3 9"/></svg></button>` : ''}</td>
@@ -6188,11 +6234,13 @@ function resetPosReceiptFields(){
   const name = document.getElementById('pos-cust-name');
   const phone = document.getElementById('pos-cust-phone');
   const email = document.getElementById('pos-cust-email');
-  const prep = document.getElementById('pos-prepare-receipt');
+  // Deliberately NOT resetting "Prepare Receipt" here — it used to be re-unchecked
+  // after every single sale (and every Clear Cart), silently re-disabling the Charge
+  // button with no visible error until the cashier noticed and re-ticked it. Since a
+  // receipt is wanted for every sale, leave it however the cashier last set it.
   if (name) name.value = '';
   if (phone) phone.value = '';
   if (email) email.value = '';
-  if (prep) prep.checked = false;
 }
 
 // Reads the optional Customer fields as typed — trimmed, blanks become null.
@@ -6834,7 +6882,7 @@ function wireFilters(){
 function filterOrders(){
   const q = document.getElementById('orders-search').value.toLowerCase();
   const status = document.getElementById('orders-status-filter').value;
-  renderOrdersTable(cache.orders.filter(o =>
+  renderOrdersTable(mergedOrdersList().filter(o =>
     (!status || o.status === status) &&
     ((o.order_number||'').toLowerCase().includes(q) || (o.customers?.full_name||'').toLowerCase().includes(q))
   ));
