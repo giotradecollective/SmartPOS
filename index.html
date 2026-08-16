@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Urbanist:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
 <script>
   // Lets the app shell (this page + its fonts/CDN scripts) load without a live
   // connection. Requires HTTPS (or localhost) — silently no-ops anywhere that
@@ -469,6 +470,50 @@
   }
   .pin-modal-close:hover{ background:var(--surface-2); color:var(--text); }
   .pin-modal-sub{ margin-top:6px; font-size:12px; color:var(--text-muted); line-height:1.5; }
+
+  /* ================= QR RECEIPT MODAL ================= */
+  /* Shown right after a sale when "QR Receipt" is ticked — lets the customer scan
+     with their own phone instead of the cashier printing/downloading anything.
+     The QR encodes the full receipt in the link itself (see receiptShareUrl()),
+     so scanning it works even if the store's connection is down (loadshedding etc);
+     the customer's phone only needs its own signal to open the link once scanned. */
+  .qr-receipt-wrap{
+    display:flex; flex-direction:column; align-items:center; gap:14px; margin-top:18px;
+  }
+  .qr-receipt-canvas-box{
+    background:#ffffff; border-radius:14px; padding:14px; box-shadow:0 10px 28px -14px rgba(0,0,0,.65);
+    display:flex; align-items:center; justify-content:center; width:212px; height:212px;
+  }
+  .qr-receipt-canvas-box canvas{ width:100%; height:100%; display:block; }
+  .qr-receipt-meta{ text-align:center; }
+  .qr-receipt-meta .order{ font-family:var(--font-mono); font-size:13px; font-weight:700; color:var(--text); }
+  .qr-receipt-meta .total{ font-size:12px; color:var(--text-muted); margin-top:2px; }
+  .qr-receipt-linkrow{
+    display:flex; align-items:center; gap:8px; width:100%; margin-top:2px;
+  }
+  .qr-receipt-linkrow input{
+    flex:1; min-width:0; background:var(--surface-2); border:1px solid var(--border); border-radius:9px;
+    padding:9px 10px; font-size:11px; color:var(--text-muted); font-family:var(--font-mono);
+  }
+  .qr-receipt-linkrow button{
+    background:var(--raised); border:1px solid var(--border); border-radius:9px; padding:9px 12px;
+    font-size:11.5px; font-weight:700; color:var(--text); white-space:nowrap; transition:background .15s;
+  }
+  .qr-receipt-linkrow button:hover{ background:var(--surface-2); }
+
+  /* Full-screen view a customer lands on after scanning — a bare receipt + save
+     button, no login screen or app chrome underneath is ever visible. */
+  #qr-receipt-standalone{
+    position:fixed; inset:0; z-index:99999; background:#0a0a0a; overflow-y:auto;
+    display:flex; flex-direction:column; align-items:center; padding:36px 16px 48px; gap:18px;
+  }
+  #qr-receipt-standalone canvas{ max-width:100%; width:420px; height:auto; border-radius:10px; box-shadow:0 10px 28px -14px rgba(0,0,0,.65); }
+  #qr-receipt-standalone .save-btn{
+    background:var(--amber); color:#000; border:none; border-radius:10px; padding:13px 26px;
+    font-weight:700; font-size:14px; font-family:var(--font-display); cursor:pointer;
+  }
+  #qr-receipt-standalone .note{ color:var(--text-dim); font-size:11.5px; max-width:340px; text-align:center; line-height:1.5; }
+  #qr-receipt-standalone .baderr{ color:var(--text-muted); font-size:13px; text-align:center; max-width:300px; }
   .pin-dots{ display:flex; align-items:center; justify-content:center; gap:14px; margin:22px 0 6px; }
   .pin-dot{
     width:13px; height:13px; border-radius:50%; border:1.5px solid var(--border); background:transparent;
@@ -1616,6 +1661,22 @@
             </label>
             <div style="font-size:10.5px; color:var(--text-dim); margin:-2px 0 12px 2px; line-height:1.4;">Required to charge — a downloadable receipt image is generated once the sale completes.</div>
 
+            <!-- QR Receipt: independent of "Prepare Receipt" above. Instead of (or as well
+                 as) the cashier's own JPEG download, this pops up a QR code the customer
+                 scans with their own phone to get the receipt — useful when there's no
+                 printer, or during loadshedding when handing over a paper slip or emailing
+                 a copy isn't practical. The whole receipt is encoded into the QR link
+                 itself (see receiptShareUrl()), so it still works even if the store's
+                 own connection is down. -->
+            <label class="pos-receipt-toggle" for="pos-qr-receipt">
+              <input type="checkbox" id="pos-qr-receipt" />
+              <span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3M14 20h3M20 14v3M20 20v.01"/></svg>
+                QR Receipt
+              </span>
+            </label>
+            <div style="font-size:10.5px; color:var(--text-dim); margin:-2px 0 12px 2px; line-height:1.4;">Customer scans a code to get their receipt on their own phone — handy for loadshedding or no printer.</div>
+
             <div class="pos-totals">
               <div class="row"><span>Subtotal</span><span id="pos-subtotal" class="mono">R 0,00</span></div>
               <div class="row" id="pos-discount-row" style="cursor:pointer;" title="Tap to apply a discount">
@@ -2059,6 +2120,33 @@
   </div>
 </div>
 
+<!-- ================= QR RECEIPT MODAL ================= -->
+<!-- Opens automatically right after a completed sale when "QR Receipt" is ticked
+     in the POS cart. Nothing here depends on Supabase or any other network call —
+     the QR code is generated from a link that already contains the whole receipt
+     (see receiptShareUrl()/showQrReceiptModal()), so this works during an outage
+     exactly the same as when everything is online. -->
+<div id="qr-receipt-modal" class="pin-modal-overlay">
+  <div class="pin-modal">
+    <div class="pin-modal-head">
+      <div class="pin-modal-title">Scan for receipt</div>
+      <button class="pin-modal-close" id="qr-receipt-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="pin-modal-sub">Ask the customer to scan this with their phone camera — it opens their receipt directly, no app or signal to your till needed.</div>
+    <div class="qr-receipt-wrap">
+      <div class="qr-receipt-canvas-box"><canvas id="qr-receipt-canvas"></canvas></div>
+      <div class="qr-receipt-meta">
+        <div class="order" id="qr-receipt-order">—</div>
+        <div class="total" id="qr-receipt-total">—</div>
+      </div>
+      <div class="qr-receipt-linkrow">
+        <input id="qr-receipt-link" type="text" readonly />
+        <button type="button" id="qr-receipt-copy">Copy link</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script>
 /* Hand-drawn food doodle icons — cropped from the uploaded sprite sheet, base64-embedded
    so the dashboard stays a single portable file. Matched to products by keyword below. */
@@ -2070,6 +2158,13 @@ const FOOD_ICONS = {"burger_classic": "data:image/png;base64,iVBORw0KGgoAAAANSUh
 const SUPABASE_URL = 'https://wqwffduyxnfepwktjsfq.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_gHatc0sG7HBbqf5-zBtSfw_vhI-Tm9q';
 const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+
+// If this tab was opened by scanning a QR receipt (rather than a normal sign-in),
+// show that receipt full-screen immediately — before the login screen/boot logic
+// below gets a chance to flash past underneath it. renderStandaloneReceiptFromHash
+// is a function declaration further down this same script, so it's already
+// available here regardless of load order.
+renderStandaloneReceiptFromHash();
 
 let CURRENCY = 'ZAR';
 let BUSINESS_ID = null;
@@ -6040,7 +6135,7 @@ async function completeSale(){
     // The whole reason "Prepare Receipt" gates checkout: as soon as the sale is
     // durably recorded (or durably queued), bake the business, order and customer
     // details into a JPEG and hand it straight to the browser's download flow.
-    downloadReceiptImage({
+    const receiptObj = {
       business: document.getElementById('sb-biz-name')?.textContent || 'Business',
       branch: AUTH_PROFILE?.branches?.name || '',
       title: 'SALES RECEIPT',
@@ -6051,7 +6146,15 @@ async function completeSale(){
       subtotal, discount, tax, total,
       paymentLabel: paidVia.charAt(0).toUpperCase() + paidVia.slice(1),
       customer: customerRecord ? { name: customerRecord.full_name, phone: customerRecord.phone, email: customerRecord.email } : customerInput,
-    });
+    };
+    downloadReceiptImage(receiptObj);
+    // "QR Receipt" is an independent, opt-in toggle (see the POS cart) — when
+    // ticked, also pop up a QR code the customer can scan for their own copy.
+    // Works the same online or offline/mid-loadshedding, since the whole receipt
+    // rides inside the QR link itself rather than being fetched from anywhere.
+    if (document.getElementById('pos-qr-receipt')?.checked) {
+      showQrReceiptModal(receiptObj);
+    }
     renderPosGrid();
     renderLowStock();
   }
@@ -6607,6 +6710,109 @@ function downloadReceiptImage(r){
     console.error('downloadReceiptImage failed:', err);
     showPosToast('Sale saved, but the receipt image could not be generated.', true);
   }
+}
+
+/* =====================================================================================
+   QR RECEIPT — the whole receipt travels inside the QR code's own link (as a
+   base64 blob in the URL hash), so opening it never depends on Supabase, this
+   till's connection, or any server round-trip. Built specifically so it still
+   works during a loadshedding outage: the cashier's device only needs enough
+   power to show the QR on screen, and the customer's phone only needs its own
+   signal (mobile data/wifi), not the store's, to open the link once scanned.
+===================================================================================== */
+function b64urlEncode(str){
+  return btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+function b64urlDecode(str){
+  let b64 = String(str).replace(/-/g, '+').replace(/_/g, '/');
+  while (b64.length % 4) b64 += '=';
+  return decodeURIComponent(escape(atob(b64)));
+}
+// Short keys keep the encoded blob (and therefore the QR code's density) as small
+// as possible — matters most on receipts with a lot of line items.
+function compactReceiptForShare(r){
+  return {
+    b: r.business || '', br: r.branch || '', t: r.title || '', on: r.orderNumber || '',
+    d: r.dateStr || '', c: r.cashier || '',
+    i: (r.items || []).map(l => [l.name, l.price, l.qty]),
+    s: r.subtotal, dc: r.discount, tx: r.tax, tt: r.total, p: r.paymentLabel || '',
+    cu: r.customer ? [r.customer.name || '', r.customer.phone || '', r.customer.email || ''] : null,
+  };
+}
+function expandReceiptFromShare(c){
+  return {
+    business: c.b, branch: c.br, title: c.t, orderNumber: c.on, dateStr: c.d, cashier: c.c,
+    items: (c.i || []).map(a => ({ name: a[0], price: a[1], qty: a[2] })),
+    subtotal: c.s, discount: c.dc, tax: c.tx, total: c.tt, paymentLabel: c.p,
+    customer: c.cu ? { name: c.cu[0], phone: c.cu[1], email: c.cu[2] } : null,
+  };
+}
+function encodeReceiptData(r){ return b64urlEncode(JSON.stringify(compactReceiptForShare(r))); }
+function decodeReceiptData(str){ return expandReceiptFromShare(JSON.parse(b64urlDecode(str))); }
+function receiptShareUrl(r){ return location.origin + location.pathname + '#receipt=' + encodeReceiptData(r); }
+
+// Opens the QR modal for a just-completed sale. Independent of downloadReceiptImage()
+// above — a cashier can tick either toggle, or both.
+function showQrReceiptModal(r){
+  try {
+    const url = receiptShareUrl(r);
+    document.getElementById('qr-receipt-order').textContent = r.orderNumber || '';
+    document.getElementById('qr-receipt-total').textContent = fmtMoney(r.total) + ' · ' + (r.paymentLabel || '');
+    document.getElementById('qr-receipt-link').value = url;
+    const canvas = document.getElementById('qr-receipt-canvas');
+    QRCode.toCanvas(canvas, url, { width: 184, margin: 1, color: { dark: '#0a0a0a', light: '#ffffff' } }, (err) => {
+      if (err) { console.error('QR generation failed:', err); showPosToast('Could not generate the QR code.', true); }
+    });
+    document.getElementById('qr-receipt-modal').classList.add('open');
+  } catch (err) {
+    console.error('showQrReceiptModal failed:', err);
+    showPosToast('Sale saved, but the QR receipt could not be generated.', true);
+  }
+}
+document.getElementById('qr-receipt-close').addEventListener('click', () =>
+  document.getElementById('qr-receipt-modal').classList.remove('open'));
+document.getElementById('qr-receipt-copy').addEventListener('click', async () => {
+  const input = document.getElementById('qr-receipt-link');
+  input.select();
+  try {
+    await navigator.clipboard.writeText(input.value);
+    showPosToast('Receipt link copied.');
+  } catch (err) {
+    document.execCommand('copy'); // clipboard API can be unavailable (older WebViews, non-HTTPS) — falls back silently
+  }
+});
+
+// Landing view for anyone who scans/opens a QR receipt link (customer's own
+// phone/browser — a different device and tab to the till that generated it).
+// Renders as a full-screen overlay rather than clearing the page, so it can run
+// this early without disturbing whatever the rest of the app's boot sequence is
+// about to do underneath it.
+function renderStandaloneReceiptFromHash(){
+  const m = location.hash.match(/^#receipt=(.+)$/);
+  if (!m) return false;
+  const wrap = document.createElement('div');
+  wrap.id = 'qr-receipt-standalone';
+  try {
+    const r = decodeReceiptData(decodeURIComponent(m[1]));
+    document.title = 'Receipt' + (r.orderNumber ? ' — ' + r.orderNumber : '');
+    const canvas = generateReceiptCanvas(r);
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'save-btn';
+    saveBtn.textContent = 'Save receipt image';
+    saveBtn.addEventListener('click', () => downloadReceiptImage(r));
+    const note = document.createElement('div');
+    note.className = 'note';
+    note.textContent = 'This receipt lives only in this link — save the image above if you need to keep a copy.';
+    wrap.append(canvas, saveBtn, note);
+  } catch (err) {
+    console.error('Could not read receipt link:', err);
+    const bad = document.createElement('div');
+    bad.className = 'baderr';
+    bad.textContent = "This receipt link couldn't be read. Ask the store for a new QR code.";
+    wrap.appendChild(bad);
+  }
+  document.body.appendChild(wrap);
+  return true;
 }
 
 function showPosToast(msg, isError){
