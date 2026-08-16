@@ -3155,11 +3155,19 @@ function renderStaffPinList(){
 /* =====================================================================================
    DATA LOADING
 ===================================================================================== */
+let _retryFailedSectionsHandler = null; // see loadAll() — cleared/reassigned each time it runs
+
 async function loadAll(){
   // Clear the period-metrics cache once, synchronously, before any of the below kick off
   // their own fetches — every card asking for the same window this cycle should share one
   // fetch, and no card should have its fresh data wiped out mid-flight by a later clear.
   invalidatePeriodCache();
+  // Drop any retry-on-reconnect listener left over from a previous loadAll() — otherwise
+  // switching user / reloading data repeatedly would stack up duplicate 'online' handlers.
+  if (_retryFailedSectionsHandler) {
+    window.removeEventListener('online', _retryFailedSectionsHandler);
+    _retryFailedSectionsHandler = null;
+  }
   const tasks = [
     ['KPIs', loadKpis],
     ['sales chart', loadSalesChart],
@@ -3183,6 +3191,27 @@ async function loadAll(){
   if (failures.length) {
     console.error('Dashboard load errors:', failures.map(f => ({ section: f.name, error: f.r.reason })));
     showLoadWarning(failures);
+    // If this was (at least partly) just "no connection", don't leave the cashier staring
+    // at a stale warning all shift — quietly retry those sections the moment we're back
+    // online, and clear the banner as soon as they succeed.
+    _retryFailedSectionsHandler = async () => {
+      const stillFailing = [];
+      for (const f of failures) {
+        const task = tasks.find(t => t[0] === f.name);
+        if (!task) continue;
+        try { await task[1](); } catch (err) { stillFailing.push({ name: f.name, r: { reason: err } }); }
+      }
+      const box = document.getElementById('load-warning-box');
+      if (box) box.remove();
+      if (stillFailing.length) {
+        showLoadWarning(stillFailing);
+      } else {
+        renderLowStock();
+        renderSalesPerformanceCards();
+        showPosToast('Back online — dashboard refreshed.');
+      }
+    };
+    window.addEventListener('online', _retryFailedSectionsHandler, { once: true });
   }
 
   renderLowStock();
@@ -3201,12 +3230,38 @@ async function loadAll(){
   flushOfflineQueue();
 }
 
+// Network-shaped failures (see isNetworkError()) get a calm, plain-language notice —
+// nothing is broken, these panels just need a connection and will refresh themselves.
+// Genuine server-side errors (bad schema, RLS, etc.) still get the full technical dump,
+// since those need a human to actually go fix something.
 function showLoadWarning(failures){
+  const existing = document.getElementById('load-warning-box');
+  if (existing) existing.remove();
+
+  const networkFailures = failures.filter(f => isNetworkError(f.r.reason));
+  const otherFailures = failures.filter(f => !isNetworkError(f.r.reason));
+
   const box = document.createElement('div');
-  box.style.cssText = 'background:rgba(229,72,77,0.1); border:1px solid var(--red-dim); color:var(--red); border-radius:0; padding:12px 16px; margin-bottom:18px; font-size:12.5px; line-height:1.6;';
-  box.innerHTML = `<strong>${failures.length} section(s) failed to load</strong><br/>` +
-    failures.map(f => `${esc(f.name)}: ${esc(f.r.reason?.message || String(f.r.reason))}`).join('<br/>') +
-    `<br/><span style="opacity:.75;">Open the browser console (F12) for full details.</span>`;
+  box.id = 'load-warning-box';
+  let html = '';
+
+  if (networkFailures.length) {
+    const names = networkFailures.map(f => esc(f.name)).join(', ');
+    html += `<div style="background:rgba(255,255,255,0.04); border:1px solid var(--border); color:var(--text-muted); border-radius:var(--radius); padding:12px 16px; margin-bottom:10px; font-size:12.5px; line-height:1.6;">
+      <strong style="color:var(--text);">Some reports are waiting on a connection</strong><br/>
+      ${names} ${networkFailures.length === 1 ? "hasn't" : "haven't"} loaded because this device is offline right now. Sales, the product list, and anything you ring up still work as normal — these panels will refresh automatically the moment you're back online.
+    </div>`;
+  }
+
+  if (otherFailures.length) {
+    html += `<div style="background:rgba(229,72,77,0.1); border:1px solid var(--red-dim); color:var(--red); border-radius:0; padding:12px 16px; margin-bottom:18px; font-size:12.5px; line-height:1.6;">
+      <strong>${otherFailures.length} section(s) failed to load</strong><br/>` +
+      otherFailures.map(f => `${esc(f.name)}: ${esc(f.r.reason?.message || String(f.r.reason))}`).join('<br/>') +
+      `<br/><span style="opacity:.75;">Open the browser console (F12) for full details.</span>
+    </div>`;
+  }
+
+  box.innerHTML = html;
   document.getElementById('main-content').prepend(box);
 }
 
