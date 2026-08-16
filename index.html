@@ -2169,10 +2169,17 @@ const sb = supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 
 // If this tab was opened by scanning a QR receipt (rather than a normal sign-in),
 // show that receipt full-screen immediately — before the login screen/boot logic
-// below gets a chance to flash past underneath it. renderStandaloneReceiptFromHash
-// is a function declaration further down this same script, so it's already
-// available here regardless of load order.
-renderStandaloneReceiptFromHash();
+// below gets a chance to flash past underneath it. The actual call to
+// renderStandaloneReceiptFromHash() is placed at the END of this script instead
+// of here: the function itself is hoisted and would be callable from this point,
+// but it calls generateReceiptCanvas(), which uses `const fmtMoney` — and const/let
+// bindings are NOT usable before their own declaration line runs (temporal dead
+// zone). Calling it this early threw "Cannot access 'fmtMoney' before
+// initialization" on every single receipt link, 100% of the time. Because this
+// script tag isn't deferred, the browser still runs everything below — including
+// the moved call — before the page paints, so it's just as "immediate" from the
+// user's point of view; it just now runs after every const/function it depends on
+// has actually initialized.
 
 let CURRENCY = 'ZAR';
 let BUSINESS_ID = null;
@@ -7199,6 +7206,11 @@ function subscribeRealtime(){
       refreshPeriodCards)
     .subscribe();
 }
+
+// If this tab was opened by scanning a QR receipt, show it full-screen now — see
+// the comment near the top of this script for why the call lives down here rather
+// than up there (fmtMoney/generateReceiptCanvas need to be initialized first).
+renderStandaloneReceiptFromHash();
 </script>
 </body>
 </html>
