@@ -2135,6 +2135,28 @@ function loadProductsCache(){
   } catch (err) { return []; }
 }
 
+// ---- BOOT SNAPSHOT ---------------------------------------------------------------
+// Everything a terminal needs to get from "tab just opened" to "cashier can ring up
+// a sale" without a single network call: which account/profile/business/branch this
+// device last booted as, plus the staff directory (so PIN-based Switch User keeps
+// working — PIN checks are already pure client-side sha256, see handlePinSelect()).
+// Written at the end of every successful *live* boot() and read by resumeFromSnapshot()
+// when boot() can't reach the network at all, or when the tab is (re)loaded already
+// offline — see attemptOfflineResume()/tryOfflineResume() near the AUTH section.
+const BOOT_SNAPSHOT_KEY = 'giotrade_boot_snapshot_v1';
+let OFFLINE_RESUMED = false; // true once this tab entered via resumeFromSnapshot() rather than a live boot()
+
+function saveBootSnapshot(snapshot){
+  try { localStorage.setItem(BOOT_SNAPSHOT_KEY, JSON.stringify(snapshot)); }
+  catch (err) { /* storage full/unavailable — offline resume just won't be available next time */ }
+}
+function loadBootSnapshot(){
+  try {
+    const raw = localStorage.getItem(BOOT_SNAPSHOT_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch (err) { return null; }
+}
+
 // Queues one fully-self-contained sale (everything writeSaleToServer() needs — no
 // reliance on posCart/posDiscount/etc, which may have already changed by sync time).
 // Also optimistically decrements local stock so the POS grid reflects what's actually
@@ -2333,10 +2355,19 @@ loginForm.addEventListener('submit', async (e) => {
   const email = document.getElementById('email').value.trim();
   const password = document.getElementById('password').value;
 
-  const { data, error } = await sb.auth.signInWithPassword({ email, password });
+  let data = null, error = null;
+  try {
+    const res = await sb.auth.signInWithPassword({ email, password });
+    data = res.data; error = res.error;
+  } catch (err) { error = err; }
 
   if (error) {
-    loginError.textContent = error.message || 'Sign in failed. Check your email and password.';
+    // A dropped connection, not a bad password — if this terminal has a cached
+    // session from a previous online sign-in, resume from that instead of dead-ending.
+    if (isNetworkError(error) && await tryOfflineResume()) return;
+    loginError.textContent = isNetworkError(error)
+      ? 'No connection, and this device has no cached session to resume — sign in once while online first, then offline reloads will work.'
+      : (error.message || 'Sign in failed. Check your email and password.');
     loginError.style.display = 'block';
     loginBtn.disabled = false;
     loginBtn.textContent = 'Sign in';
@@ -2468,10 +2499,33 @@ document.getElementById('logout-btn').addEventListener('click', async () => {
   location.reload();
 });
 
-// Opening the link/tab always starts at Sign In — no silent resume from a
-// leftover browser session. The stored session is intentionally left alone
-// (not signed out) so a valid email/password submit still works instantly;
-// it's just never used to skip the login screen automatically.
+// Opening the link/tab normally always starts at Sign In — no silent resume from a
+// leftover browser session, since sign-in itself is a live credential check by design
+// (see the OFFLINE SUPPORT note near the top of this script). The one exception: if
+// there's no connection at all right when the tab opens — a reload mid-shift during
+// a drop, a service-worker update, load-shedding — a login form can never submit
+// anyway, so instead of dead-ending the till, fall back to whichever account this
+// terminal last booted as successfully, entirely from the local snapshot in
+// BOOT SNAPSHOT above. The instant connectivity is back, any fresh reload goes
+// through the normal live sign-in again — this only ever bridges an outage.
+async function tryOfflineResume(){
+  try {
+    const { data } = await sb.auth.getSession();
+    const user = data?.session?.user;
+    if (!user) return false; // never signed in on this device — nothing to resume into
+    const snapshot = loadBootSnapshot();
+    if (!snapshot || snapshot.userId !== user.id) return false;
+    showBootSplash();
+    await hideBootSplashAfter(resumeFromSnapshot(user, snapshot));
+    return true;
+  } catch (err) {
+    return false; // fall through to the ordinary login screen rather than a blank page
+  }
+}
+(function attemptOfflineResumeOnLoad(){
+  if (isOnline()) return; // normal path — let the person sign in live as usual
+  tryOfflineResume();
+})();
 
 /* =====================================================================================
    BOOT — resolve profile + business, then load dashboard
@@ -2481,11 +2535,29 @@ async function boot(user){
   const app = document.getElementById('app');
   app.classList.add('active');
 
-  const { data: profile, error: profErr } = await sb
-    .from('profiles')
-    .select('id, full_name, role, business_id, branch_id, branches(name), businesses(name, currency, timezone, logo_url)')
-    .eq('id', user.id)
-    .single();
+  let profile = null, profErr = null;
+  try {
+    const res = await sb
+      .from('profiles')
+      .select('id, full_name, role, business_id, branch_id, branches(name), businesses(name, currency, timezone, logo_url)')
+      .eq('id', user.id)
+      .single();
+    profile = res.data; profErr = res.error;
+  } catch (err) { profErr = err; }
+
+  // A dropped connection here (vs a genuine "no profile row" rejection) should fall
+  // back to whatever this device last booted as successfully — see resumeFromSnapshot()
+  // and the BOOT SNAPSHOT block above — rather than dead-ending the till.
+  if (profErr && isNetworkError(profErr)) {
+    const snapshot = loadBootSnapshot();
+    if (snapshot && snapshot.userId === user.id) {
+      await resumeFromSnapshot(user, snapshot);
+      return;
+    }
+    document.getElementById('main-loading').innerHTML =
+      `<div class="empty-state" style="color:var(--red);">No connection, and this device has never completed a sign-in while online.<br/>Sign in once with a live connection first — after that, this terminal can resume offline.</div>`;
+    return;
+  }
 
   if (profErr || !profile) {
     document.getElementById('main-loading').innerHTML =
@@ -2507,13 +2579,15 @@ async function boot(user){
   // fall back to the business's first branch so checkout still has a valid id to write.
   BRANCH_ID = profile.branch_id || null;
   if (!BRANCH_ID) {
-    const { data: fallbackBranch } = await sb
-      .from('branches')
-      .select('id')
-      .eq('business_id', BUSINESS_ID)
-      .limit(1)
-      .maybeSingle();
-    BRANCH_ID = fallbackBranch?.id || null;
+    try {
+      const { data: fallbackBranch } = await sb
+        .from('branches')
+        .select('id')
+        .eq('business_id', BUSINESS_ID)
+        .limit(1)
+        .maybeSingle();
+      BRANCH_ID = fallbackBranch?.id || null;
+    } catch (err) { /* connection dropped mid-boot — carry on, the snapshot below just won't have one yet */ }
   }
 
   AUTH_PROFILE = profile; // the account that actually typed email+password for this terminal
@@ -2542,10 +2616,73 @@ async function boot(user){
   if (recBizMeta) recBizMeta.textContent =
     `${profile.branches?.name ? profile.branches.name + ' · ' : ''}${profile.businesses?.timezone || ''}`;
 
+  // Remember everything this terminal needs to get back to work with zero connection
+  // (see resumeFromSnapshot() below and tryOfflineResume() near the AUTH section).
+  // Refreshed on every successful live boot, so it's never more stale than "since the
+  // last time this device actually had signal".
+  saveBootSnapshot({
+    userId: user.id,
+    email: user.email,
+    profile,
+    businessId: BUSINESS_ID,
+    branchId: BRANCH_ID,
+    currency: CURRENCY,
+    businessName: bizName,
+    businessLogo: bizLogo || null,
+    branchName: profile.branches?.name || null,
+    timezone: profile.businesses?.timezone || null,
+    staffDirectory: STAFF_DIRECTORY,
+  });
+
   // Nothing dashboard-related has loaded yet. Whoever is physically at the
   // terminal now picks their own name/PIN before any data — let alone the
   // Overview analytics — ever touches the screen.
   openRoleSelect(bizName, bizLogo);
+}
+
+// Brings the terminal straight to the role-select gate using the last successful
+// live boot()'s data, entirely from localStorage — no Supabase reads at all. Used
+// both when boot() itself can't reach the network (see isNetworkError() branch
+// above) and when the tab is (re)loaded already offline (see tryOfflineResume()).
+async function resumeFromSnapshot(user, snapshot){
+  OFFLINE_RESUMED = true;
+  document.getElementById('login-screen').style.display = 'none';
+  document.getElementById('app').classList.add('active');
+
+  BUSINESS_ID = snapshot.businessId;
+  CASHIER_ID = snapshot.profile.id;
+  PROFILE_ID = snapshot.profile.id;
+  CURRENCY = snapshot.currency || 'ZAR';
+  BRANCH_ID = snapshot.branchId || null;
+  AUTH_PROFILE = snapshot.profile;
+  AUTH_EMAIL = snapshot.email || user.email;
+  STAFF_DIRECTORY = snapshot.staffDirectory || [];
+
+  setupPinPad();
+  setupReauthModal();
+  setupRefundModal();
+  setupSplitModal();
+  setupDiscountModal();
+
+  const bizName = snapshot.businessName || 'Business';
+  const bizLogo = snapshot.businessLogo;
+  document.getElementById('sb-biz-name').textContent = bizName;
+  document.title = bizName + ' — Dashboard';
+  const logoMark = document.getElementById('sb-logo-mark');
+  if (bizLogo) {
+    logoMark.innerHTML = `<img src="${esc(bizLogo)}" alt="${esc(bizName)} logo" />`;
+  } else {
+    logoMark.textContent = bizName.trim().charAt(0).toUpperCase() || '–';
+  }
+
+  const recBizName = document.getElementById('rec-biz-name');
+  if (recBizName) recBizName.textContent = bizName;
+  const recBizMeta = document.getElementById('rec-biz-meta');
+  if (recBizMeta) recBizMeta.textContent =
+    `${snapshot.branchName ? snapshot.branchName + ' · ' : ''}${snapshot.timezone || ''}`;
+
+  openRoleSelect(bizName, bizLogo);
+  updateOfflineBadge();
 }
 
 /* =====================================================================================
@@ -2581,7 +2718,14 @@ function openRoleSelect(bizName, bizLogo){
       <div class="rs-role">Continue as ${esc(AUTH_PROFILE.role)}</div>
     </div>
     <div class="rs-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg></div>`;
-  selfTile.addEventListener('click', () => openReauthModal());
+  selfTile.addEventListener('click', () => {
+    // The password re-check below is a live Supabase Auth call. With no connection
+    // there's nothing to verify it against, so skip straight in rather than lock the
+    // terminal out of a session it's already legitimately holding — see the OFFLINE
+    // SUPPORT note near the top of this script for the same reasoning applied to boot().
+    if (!isOnline()) { enterDashboardAs(AUTH_PROFILE); return; }
+    openReauthModal();
+  });
   list.appendChild(selfTile);
 
   if (STAFF_DIRECTORY.length) {
@@ -2866,10 +3010,23 @@ function setupReauthModal(){
     const prevLabel = btn.textContent;
     btn.innerHTML = '<span class="loader" style="border-top-color:#000000;"></span>';
 
-    const { error } = await sb.auth.signInWithPassword({ email: AUTH_EMAIL, password: pwd });
+    let error = null;
+    try {
+      const res = await sb.auth.signInWithPassword({ email: AUTH_EMAIL, password: pwd });
+      error = res.error;
+    } catch (err) { error = err; }
 
     btn.disabled = false;
     btn.textContent = prevLabel;
+
+    if (error && isNetworkError(error)) {
+      // Connection dropped mid-check, not a wrong password — don't lock someone out
+      // of a session they already hold just because the verify call itself couldn't
+      // reach the network (same reasoning as the self-tile shortcut above).
+      closeReauthModal();
+      await enterDashboardAs(AUTH_PROFILE);
+      return;
+    }
 
     if (error) {
       errEl.textContent = 'Incorrect password. Try again.';
