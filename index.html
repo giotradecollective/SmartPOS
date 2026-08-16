@@ -2165,9 +2165,14 @@ function queueOfflineSale(sale){
   const queue = getOfflineQueue();
   queue.push(sale);
   setOfflineQueue(queue);
-  sale.items.forEach(it => {
-    const p = cache.products.find(p => String(p.id) === String(it.product_id));
-    if (p) p.current_stock = Math.max(0, Number(p.current_stock) - Number(it.quantity));
+  // The sale object (built in completeSale()) carries the cart as `cartSnapshot`
+  // ({ id, price, qty }), not `items`/`product_id`/`quantity` — using the wrong
+  // field names here threw a TypeError on every single offline sale, which skipped
+  // updateOfflineBadge() below and (before completeSale()'s offline branch had its
+  // own try/finally) left the Charge button stuck mid-spinner, unable to reset.
+  (sale.cartSnapshot || []).forEach(it => {
+    const p = cache.products.find(p => String(p.id) === String(it.id));
+    if (p) p.current_stock = Math.max(0, Number(p.current_stock) - Number(it.qty));
   });
   updateOfflineBadge();
 }
@@ -5951,11 +5956,23 @@ async function completeSale(){
   }
 
   if (!isOnline()) {
-    queueOfflineSale(sale);
-    finishLocally(true);
-    posBusy = false;
-    btn.innerHTML = originalHtml;
-    btn.disabled = posCart.length === 0;
+    // Mirrors the online path's try/finally below: anything that throws inside the
+    // queue/finish steps (a bad localStorage write, a receipt-image hiccup, etc.)
+    // must still release the Charge button — otherwise posBusy stays stuck true and
+    // the button is left frozen mid-spinner for the rest of the shift.
+    try {
+      queueOfflineSale(sale);
+      finishLocally(true);
+    } catch (err) {
+      console.error('Offline sale queue/finish failed:', err);
+      errBox.textContent = 'Sale could not be saved to the offline queue: ' + (err.message || String(err));
+      errBox.style.display = 'block';
+      showPosToast('Sale not saved — see error below.', true);
+    } finally {
+      posBusy = false;
+      btn.innerHTML = originalHtml;
+      btn.disabled = posCart.length === 0;
+    }
     return;
   }
 
